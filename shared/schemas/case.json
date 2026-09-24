@@ -1,0 +1,213 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://promptwars-legal-ai/schemas/case.json",
+  "title": "Case",
+  "description": "Legal case document — language-agnostic source of truth for the PromptWars Legal AI platform. Mirrors the TypeScript Case interface and Python Pydantic Case model.",
+  "type": "object",
+  "required": ["caseId", "userId", "narrative", "status", "timestamps"],
+  "additionalProperties": false,
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "description": "Unique case identifier (UUID or Firebase document ID)",
+      "minLength": 1
+    },
+    "userId": {
+      "type": "string",
+      "description": "Firebase Auth UID of the case owner",
+      "minLength": 1
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "Legal jurisdiction code (e.g. 'GB-ENG', 'US-CA', 'IN'). Future: BCP-47 region tag.",
+      "minLength": 1
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Raw user-submitted narrative text",
+      "minLength": 1,
+      "maxLength": 50000
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "INTAKE", "ANALYZING", "STRUCTURED", "ACTION_READY", "CLOSED", "ARCHIVED"],
+      "description": "Current lifecycle status of the case"
+    },
+    "timestamps": {
+      "type": "object",
+      "required": ["createdAt", "updatedAt"],
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "intakeCompletedAt": { "type": "string", "format": "date-time" },
+        "analysisCompletedAt": { "type": "string", "format": "date-time" },
+        "closedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "structuredFacts": {
+      "type": "array",
+      "description": "Facts extracted from narrative by AI Module 02",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "confidence"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "sourceNarrativeOffset": { "type": "integer" }
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "description": "Named entities identified in the narrative",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "role"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "role": {
+            "type": "string",
+            "enum": ["CLAIMANT", "RESPONDENT", "WITNESS", "THIRD_PARTY", "INSTITUTION", "OTHER"]
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "description": "Chronological events extracted from narrative",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "confidence"],
+        "properties": {
+          "id": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "approximateDate": { "type": "string" },
+          "description": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Evidence items identified or submitted",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "description", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["DOCUMENT", "PHOTO", "VIDEO", "COMMUNICATION", "TESTIMONY", "OTHER"]
+          },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["AVAILABLE", "MISSING", "PARTIAL"] },
+          "storageRef": { "type": "string", "description": "Firebase Storage path (future)" }
+        }
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "description": "Evidence gaps detected by AI Module 07",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "severity"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "severity": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+          "suggestion": { "type": "string" }
+        }
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "description": "Contradictions detected by AI Module 08",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "itemARef", "itemBRef", "severity"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "itemARef": { "type": "string" },
+          "itemBRef": { "type": "string" },
+          "severity": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "Legal sources retrieved by AI Module 05",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "retrievedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "jurisdiction": { "type": "string" },
+          "relevanceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+          "retrievedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "verification": {
+      "type": "array",
+      "description": "AI response verification records (AI Module 09)",
+      "items": {
+        "type": "object",
+        "required": ["id", "claim", "verified", "confidence", "sources"],
+        "properties": {
+          "id": { "type": "string" },
+          "claim": { "type": "string" },
+          "verified": { "type": "boolean" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "sources": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "actionPlan": {
+      "type": "array",
+      "description": "Action items generated by AI Module 10",
+      "items": {
+        "type": "object",
+        "required": ["id", "priority", "title", "description", "completed"],
+        "properties": {
+          "id": { "type": "string" },
+          "priority": { "type": "string", "enum": ["URGENT", "HIGH", "MEDIUM", "LOW"] },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "deadline": { "type": "string", "format": "date" },
+          "completed": { "type": "boolean" }
+        }
+      }
+    },
+    "documents": {
+      "type": "array",
+      "description": "Documents generated by AI Module 11",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "title", "generatedAt", "version"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "storageRef": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "version": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "language": {
+      "type": "string",
+      "description": "BCP-47 language tag (e.g. 'en', 'fr', 'hi')"
+    },
+    "aiPipelineVersion": {
+      "type": "string",
+      "description": "Version of the AI pipeline that processed this case"
+    }
+  }
+}

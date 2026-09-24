@@ -1,0 +1,103 @@
+# ─── Environment & Secrets ───────────────────────────────────────────────────
+# NEVER commit real credentials or environment files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.staging
+.env.production
+*.env
+
+# Keep the examples (no real values inside)
+!.env.example
+!frontend/.env.local.example
+!backend/.env.example
+
+# ─── Node / Frontend ─────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/.cache/
+frontend/coverage/
+frontend/.eslintcache
+frontend/npm-debug.log*
+frontend/yarn-error.log
+frontend/yarn-debug.log*
+frontend/.pnpm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── Python / Backend ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.so
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+.uv/
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# ─── Firebase ────────────────────────────────────────────────────────────────
+# Service account keys — NEVER commit
+*-service-account.json
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+
+# ─── Google Cloud ────────────────────────────────────────────────────────────
+# ADC credentials — NEVER commit
+application_default_credentials.json
+gcloud-service-key.json
+
+# ─── IDE & Editor ────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Build artifacts ─────────────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+temp/
+scratch/

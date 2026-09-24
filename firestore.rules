@@ -1,0 +1,50 @@
+rules_version = '2';
+
+/**
+ * Firestore Security Rules — Trusted Legal Access Platform
+ *
+ * Principles:
+ * 1. Default Deny: All paths are locked down by default.
+ * 2. User Isolation: Authenticated users can only read, update, or delete their own case documents.
+ * 3. Verified Creation: On document creation, the `userId` field must match `request.auth.uid`.
+ * 4. Immutable Ownership: Updates cannot alter `userId` (ownership transfers are forbidden).
+ * 5. Owner-only Deletion: Only the original owner can delete their case document.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ─── Default Deny ────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── Cases Collection ────────────────────────────────────────────────────
+    match /cases/{caseId} {
+      // Read: Users can only fetch or query cases that belong to them
+      allow get: if isOwner(resource.data.userId);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Create: Authenticated users can only create a case where userId matches their auth UID
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.caseId == caseId;
+
+      // Update: Owner only, and the userId must remain identical (cannot transfer ownership)
+      allow update: if isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId;
+
+      // Delete: Owner only
+      allow delete: if isOwner(resource.data.userId);
+    }
+  }
+}
