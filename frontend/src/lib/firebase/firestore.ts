@@ -53,10 +53,19 @@ export async function createCase(
       createdAt: now,
       updatedAt: now,
       intakeCompletedAt: draft.timestamps?.intakeCompletedAt,
+      analysisCompletedAt: draft.timestamps?.analysisCompletedAt,
     },
     structuredFacts: draft.structuredFacts,
     entities: draft.entities,
-    aiPipelineVersion: draft.aiPipelineVersion ?? '2.0',
+    timeline: draft.timeline,
+    domainRouting: draft.domainRouting,
+    knowledgeRetrieval: draft.knowledgeRetrieval,
+    evidenceItems: draft.evidenceItems,
+    evidenceGaps: draft.evidenceGaps,
+    contradictions: draft.contradictions,
+    responseVerification: draft.responseVerification,
+    actionPath: draft.actionPath,
+    aiPipelineVersion: draft.aiPipelineVersion ?? '3.0',
   };
 
   await setDoc(ref, {
@@ -66,6 +75,25 @@ export async function createCase(
   });
 
   return caseId;
+}
+
+/**
+ * Updates an existing case in Firestore.
+ */
+export async function updateCase(
+  caseId: string,
+  patch: Partial<Case>
+): Promise<void> {
+  const ref = doc(db, CASES_COLLECTION, caseId);
+  await setDoc(
+    ref,
+    {
+      ...patch,
+      'timestamps.updatedAt': new Date().toISOString(),
+      _serverUpdatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
 
 // ─── Case Retrieval ──────────────────────────────────────────────────────────

@@ -1,18 +1,17 @@
 /**
  * Primary intake form — "Tell us what happened"
  *
- * Stage 3: Full 2-module AI pipeline.
- *
- * Pipeline:
+ * Drives the continuous AI-guided legal access journey:
  *   1. User submits narrative
  *   2. Module 01: Intake Understanding (UNDERSTANDING state)
- *      → Shows CaseResultCard
- *   3. Module 02: Case Structuring (ANALYZING state)
- *      → Shows CaseStructureCard
- *   4. Auto-save to Firestore (or nudge to sign in)
- *
- * Auth is optional at intake — user sees results without signing in,
- * but saving to Firestore requires an account (handled by SaveCasePrompt).
+ *   3. Module 02: Case Structuring (STRUCTURING state)
+ *   4. Module 03: Domain & Jurisdiction Routing (RESEARCHING state)
+ *   5. Module 05: Live Legal Knowledge Retrieval (RESEARCHING state)
+ *   6. Module 07: Evidence Gap Audit (COMPARING state)
+ *   7. Module 08: Contradiction Detection (COMPARING state)
+ *   8. Module 09: Response Verification (VERIFYING state)
+ *   9. Module 10: Action Path Construction (PLANNING state)
+ *   10. Continuous Case Workspace (READY state)
  */
 
 'use client';
@@ -21,29 +20,38 @@ import { useState, useCallback } from 'react';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
 import { AIStateIndicator } from './AIStateIndicator';
-import { CaseResultCard } from './CaseResultCard';
-import { CaseStructureCard } from './CaseStructureCard';
-import { SaveCasePrompt } from './SaveCasePrompt';
+import { ContinuousCaseWorkspace } from './ContinuousCaseWorkspace';
 import { useAppStore } from '@/store/useAppStore';
 import { useCaseStore } from '@/store/useCaseStore';
+
 import { runIntakeUnderstanding } from '@/lib/ai/intakeModule';
 import { runCaseStructuring } from '@/lib/ai/caseStructureModule';
-import type { CaseIntakeResult, CaseStructureResult } from '@/lib/ai/schemas';
+import { runDomainRouting } from '@/lib/ai/domainRoutingModule';
+import { runKnowledgeRetrieval } from '@/lib/ai/knowledgeRetrievalModule';
+import { runEvidenceGapDetection } from '@/lib/ai/evidenceGapModule';
+import { runContradictionDetection } from '@/lib/ai/contradictionModule';
+import { runResponseVerification } from '@/lib/ai/responseVerifierModule';
+import { runActionPathPlan } from '@/lib/ai/actionPathModule';
+
+import type { CaseStructureResult } from '@/lib/ai/schemas';
 
 const MAX_CHARS = 5000;
 const MIN_CHARS = 50;
 
-interface PipelineResult {
-  intake: { data: CaseIntakeResult; generatedAt: string; model: string };
-  structure?: { data: CaseStructureResult; generatedAt: string };
-}
-
 export function IntakeForm() {
   const { aiState, setAIState, setAIError, resetAIState } = useAppStore();
-  const { narrativeInput, setNarrativeInput, isSubmitting, setIsSubmitting, setCurrentDraft, currentDraft } = useCaseStore();
+  const {
+    narrativeInput,
+    setNarrativeInput,
+    isSubmitting,
+    setIsSubmitting,
+    setCurrentDraft,
+    currentDraft,
+    clearDraft,
+  } = useCaseStore();
 
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
-  const [pipelineResult, setPipelineResult] = useState<PipelineResult | null>(null);
+  const [structuredResult, setStructuredResult] = useState<CaseStructureResult | undefined>(undefined);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -51,14 +59,15 @@ export function IntakeForm() {
       if (validationError && e.target.value.length >= MIN_CHARS) {
         setValidationError(undefined);
       }
-      // Clear results when narrative is edited
-      if (pipelineResult) {
-        setPipelineResult(null);
-        resetAIState();
-      }
     },
-    [setNarrativeInput, validationError, pipelineResult, resetAIState]
+    [setNarrativeInput, validationError]
   );
+
+  const handleReset = useCallback(() => {
+    clearDraft();
+    setStructuredResult(undefined);
+    resetAIState();
+  }, [clearDraft, resetAIState]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -72,7 +81,6 @@ export function IntakeForm() {
       }
 
       setValidationError(undefined);
-      setPipelineResult(null);
       setIsSubmitting(true);
 
       try {
@@ -80,7 +88,7 @@ export function IntakeForm() {
         setAIState('UNDERSTANDING');
         const intakeResponse = await runIntakeUnderstanding(narrativeInput);
 
-        const intakeDraft = {
+        const initialDraft = {
           narrative: narrativeInput.trim(),
           status: 'INTAKE' as const,
           timestamps: {
@@ -91,24 +99,70 @@ export function IntakeForm() {
           jurisdiction: intakeResponse.data.detectedJurisdiction,
           aiPipelineVersion: '3.0',
         };
-        setCurrentDraft(intakeDraft);
-
-        // Show Module 01 result while Module 02 runs
-        setPipelineResult({
-          intake: {
-            data: intakeResponse.data,
-            generatedAt: intakeResponse.generatedAt,
-            model: intakeResponse.model,
-          },
-        });
+        setCurrentDraft(initialDraft);
 
         // ─── Module 02: Case Structuring ───────────────────────────────────
-        setAIState('ANALYZING');
+        setAIState('STRUCTURING');
         const structureResponse = await runCaseStructuring(narrativeInput, intakeResponse.data);
+        setStructuredResult(structureResponse.data);
 
-        // Merge structured data into the draft
+        // ─── Module 03: Domain & Jurisdiction Routing ───────────────────────
+        setAIState('RESEARCHING');
+        const domainResponse = await runDomainRouting({
+          narrative: narrativeInput,
+          facts: structureResponse.data.structuredFacts.map((f) => f.text),
+          locationHint: intakeResponse.data.detectedJurisdiction,
+        });
+
+        // ─── Module 05: Live Knowledge Retrieval (Google Search) ────────────
+        const retrievalResponse = await runKnowledgeRetrieval({
+          structuredFacts: structureResponse.data.structuredFacts,
+          domain: domainResponse.data.domain,
+          subDomain: domainResponse.data.subDomain,
+          jurisdiction: domainResponse.data.jurisdiction,
+        });
+
+        // ─── Module 07: Evidence Gap Audit ──────────────────────────────────
+        setAIState('COMPARING');
+        const gapsResponse = await runEvidenceGapDetection({
+          narrative: narrativeInput,
+          structure: structureResponse.data,
+          evidence: [],
+          retrievedKnowledge: retrievalResponse.data,
+        });
+
+        // ─── Module 08: Contradiction Detection ─────────────────────────────
+        const contradictionsResponse = await runContradictionDetection({
+          narrative: narrativeInput,
+          structure: structureResponse.data,
+          evidence: [],
+          userClarifications: {},
+        });
+
+        // ─── Module 09: Response Verification ───────────────────────────────
+        setAIState('VERIFYING');
+        const initialDraftResponse = `Assessment for ${domainResponse.data.domain} in ${domainResponse.data.jurisdiction}: Analysis of facts and retrieved rules confirms procedural prerequisites.`;
+        const verificationResponse = await runResponseVerification({
+          draftResponse: initialDraftResponse,
+          retrievedKnowledge: retrievalResponse.data,
+          structuredFacts: structureResponse.data.structuredFacts,
+          jurisdiction: domainResponse.data.jurisdiction,
+        });
+
+        // ─── Module 10: Action Path ─────────────────────────────────────────
+        setAIState('PLANNING');
+        const actionPathResponse = await runActionPathPlan({
+          currentSituation: verificationResponse.data.verifiedSummary,
+          verifiedClaims: verificationResponse.data.claims,
+          evidenceGaps: gapsResponse.data,
+          contradictions: contradictionsResponse.data,
+          domain: domainResponse.data.domain,
+          jurisdiction: domainResponse.data.jurisdiction,
+        });
+
+        // Update complete draft in store
         setCurrentDraft({
-          ...intakeDraft,
+          ...initialDraft,
           structuredFacts: structureResponse.data.structuredFacts.map((f, i) => ({
             id: `fact-${i}`,
             text: f.text,
@@ -127,21 +181,19 @@ export function IntakeForm() {
             approximateDate: ev.approximateDate,
             confidence: ev.confidence,
           })),
+          domainRouting: domainResponse.data,
+          knowledgeRetrieval: retrievalResponse.data,
+          evidenceGaps: gapsResponse.data,
+          contradictions: contradictionsResponse.data,
+          responseVerification: verificationResponse.data,
+          actionPath: actionPathResponse.data,
+          status: 'ACTIONABLE',
           timestamps: {
-            ...intakeDraft.timestamps,
-            updatedAt: structureResponse.generatedAt,
-            analysisCompletedAt: structureResponse.generatedAt,
+            ...initialDraft.timestamps,
+            updatedAt: new Date().toISOString(),
+            analysisCompletedAt: new Date().toISOString(),
           },
-          status: 'STRUCTURED' as const,
         });
-
-        setPipelineResult((prev) => prev ? ({
-          ...prev,
-          structure: {
-            data: structureResponse.data,
-            generatedAt: structureResponse.generatedAt,
-          },
-        }) : null);
 
         setAIState('READY');
       } catch (error) {
@@ -156,9 +208,23 @@ export function IntakeForm() {
 
   const charCount = narrativeInput.length;
   const isOverLimit = charCount > MAX_CHARS;
-  const isProcessing = isSubmitting || aiState === 'UNDERSTANDING' || aiState === 'ANALYZING';
-  const hasResult = aiState === 'READY' && pipelineResult !== null;
-  const hasIntakeResult = pipelineResult?.intake != null;
+  const isProcessing =
+    isSubmitting ||
+    (aiState !== 'IDLE' && aiState !== 'READY' && aiState !== 'ERROR');
+  const hasResult =
+    aiState === 'READY' &&
+    currentDraft !== null &&
+    currentDraft.domainRouting !== undefined;
+
+  // Once the continuous pipeline has produced results, render the unified ContinuousCaseWorkspace
+  if (hasResult) {
+    return (
+      <ContinuousCaseWorkspace
+        initialStructure={structuredResult}
+        onReset={handleReset}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -171,7 +237,7 @@ export function IntakeForm() {
         <Textarea
           label="What happened?"
           hint="Describe your situation in your own words. The more detail you share, the better we can help."
-          placeholder="For example: My landlord refused to return my deposit after I moved out and won't respond to my messages..."
+          placeholder="For example: My landlord refused to return my $1,500 security deposit after I moved out on June 30th in Austin, Texas. They claimed repairs were needed but provided no itemized list within 30 days..."
           value={narrativeInput}
           onChange={handleChange}
           error={validationError}
@@ -182,12 +248,6 @@ export function IntakeForm() {
           aria-required="true"
         />
 
-        {/* Voice/Language slots — Stage 4 */}
-        <div aria-hidden="true" className="hidden">
-          {/* TODO: Voice input (useVoiceInput) — Stage 4 */}
-          {/* TODO: Language selector — Stage 4 */}
-        </div>
-
         {/* Pipeline progress */}
         <AIStateIndicator state={aiState} />
 
@@ -197,38 +257,26 @@ export function IntakeForm() {
           size="lg"
           isLoading={isProcessing}
           loadingText={
-            aiState === 'ANALYZING'
-              ? 'Building case structure…'
-              : 'Understanding your situation…'
+            aiState === 'UNDERSTANDING'
+              ? 'Understanding your situation…'
+              : aiState === 'STRUCTURING'
+              ? 'Structuring case facts & timeline…'
+              : aiState === 'RESEARCHING'
+              ? 'Researching live legal authorities…'
+              : aiState === 'COMPARING'
+              ? 'Auditing evidence & discrepancies…'
+              : aiState === 'VERIFYING'
+              ? 'Verifying claims against authorities…'
+              : aiState === 'PLANNING'
+              ? 'Formulating your action path…'
+              : 'Processing case journey…'
           }
           disabled={isOverLimit || isProcessing}
           className="w-full sm:w-auto sm:self-end"
         >
-          {hasResult ? 'Analyse again' : 'Continue'}
+          Continue
         </Button>
       </form>
-
-      {/* Module 01 result — shown as soon as Module 01 completes */}
-      {hasIntakeResult && pipelineResult?.intake && (
-        <CaseResultCard
-          result={pipelineResult.intake.data}
-          generatedAt={pipelineResult.intake.generatedAt}
-          model={pipelineResult.intake.model}
-        />
-      )}
-
-      {/* Module 02 result */}
-      {hasResult && pipelineResult?.structure && (
-        <CaseStructureCard
-          structure={pipelineResult.structure.data}
-          generatedAt={pipelineResult.structure.generatedAt}
-        />
-      )}
-
-      {/* Save prompt — shown after full pipeline completes */}
-      {hasResult && currentDraft && (
-        <SaveCasePrompt draft={currentDraft} />
-      )}
     </div>
   );
 }

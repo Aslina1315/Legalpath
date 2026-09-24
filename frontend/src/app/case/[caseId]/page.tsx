@@ -14,6 +14,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { getCaseById } from '@/lib/firebase/firestore';
 import { useAppStore } from '@/store/useAppStore';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { DomainCard } from '@/components/intake/DomainCard';
+import { KnowledgeSourcesCard } from '@/components/intake/KnowledgeSourcesCard';
+import { EvidenceGapsCard } from '@/components/intake/EvidenceGapsCard';
+import { ContradictionsCard } from '@/components/intake/ContradictionsCard';
+import { VerifiedGuidanceCard } from '@/components/intake/VerifiedGuidanceCard';
+import { ActionPathCard } from '@/components/intake/ActionPathCard';
 import type { Case } from '@/types/case';
 
 export default function CasePage() {
@@ -207,11 +213,42 @@ export default function CasePage() {
           </section>
         )}
 
-        {/* Jurisdiction */}
-        {caseData.jurisdiction && (
+        {/* Jurisdiction & Domain */}
+        {caseData.domainRouting ? (
+          <DomainCard domain={caseData.domainRouting} />
+        ) : caseData.jurisdiction ? (
           <div className="rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700">
             <strong>Jurisdiction detected:</strong> {caseData.jurisdiction}
           </div>
+        ) : null}
+
+        {/* Live Knowledge Retrieval */}
+        {caseData.knowledgeRetrieval && (
+          <KnowledgeSourcesCard retrieval={caseData.knowledgeRetrieval} />
+        )}
+
+        {/* Evidence Gaps */}
+        {caseData.evidenceGaps && (
+          <EvidenceGapsCard gapResult={caseData.evidenceGaps} />
+        )}
+
+        {/* Contradictions */}
+        {caseData.contradictions && (
+          <ContradictionsCard
+            contradictionResult={caseData.contradictions}
+            userClarifications={{}}
+            onClarificationSubmit={() => {}}
+          />
+        )}
+
+        {/* Verified Guidance */}
+        {caseData.responseVerification && (
+          <VerifiedGuidanceCard verification={caseData.responseVerification} />
+        )}
+
+        {/* Action Path */}
+        {caseData.actionPath && (
+          <ActionPathCard actionPath={caseData.actionPath} />
         )}
       </div>
 

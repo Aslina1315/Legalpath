@@ -9,6 +9,7 @@ export type CaseStatus =
   | 'ANALYZING'
   | 'STRUCTURED'
   | 'ACTION_READY'
+  | 'ACTIONABLE'
   | 'CLOSED'
   | 'ARCHIVED';
 
@@ -101,6 +102,16 @@ export interface GeneratedDocument {
   version: number;
 }
 
+import type {
+  DomainRoutingResult,
+  KnowledgeRetrievalResult,
+  EvidenceAnalysisResult,
+  EvidenceGapResult,
+  ContradictionResult,
+  ResponseVerificationResult,
+  ActionPathResult,
+} from './ai';
+
 /** Root case document — mirrors future Firestore document structure */
 export interface Case {
   caseId: string;
@@ -116,11 +127,21 @@ export interface Case {
   timeline?: TimelineEvent[];
   evidence?: Evidence[];
   gaps?: EvidenceGap[];
-  contradictions?: Contradiction[];
+  contradictions?: ContradictionResult;
   sources?: LegalSource[];
   verification?: VerificationRecord[];
   actionPlan?: ActionItem[];
   documents?: GeneratedDocument[];
+
+  // Continuous Module Pipeline Outputs
+  domainRouting?: DomainRoutingResult;
+  knowledgeRetrieval?: KnowledgeRetrievalResult;
+  evidenceAnalysis?: EvidenceAnalysisResult;
+  evidenceItems?: EvidenceAnalysisResult[];
+  evidenceGaps?: EvidenceGapResult;
+  contradictionAnalysis?: ContradictionResult;
+  responseVerification?: ResponseVerificationResult;
+  actionPath?: ActionPathResult;
 
   // Metadata
   language?: string; // BCP-47 language tag
@@ -132,3 +153,4 @@ export type CaseDraft = Omit<Case, 'caseId' | 'userId'> & {
   caseId?: string;
   userId?: string;
 };
+
