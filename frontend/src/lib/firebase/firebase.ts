@@ -27,20 +27,33 @@ const requiredEnvVars = [
 
 function validateFirebaseConfig(): void {
   const missing: string[] = [];
-  if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) missing.push('NEXT_PUBLIC_FIREBASE_API_KEY');
-  if (!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) missing.push('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN');
-  if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) missing.push('NEXT_PUBLIC_FIREBASE_PROJECT_ID');
-  if (!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) missing.push('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET');
-  if (!process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID) missing.push('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
-  if (!process.env.NEXT_PUBLIC_FIREBASE_APP_ID) missing.push('NEXT_PUBLIC_FIREBASE_APP_ID');
+  const placeholders: string[] = [];
 
-  if (missing.length > 0) {
-    if (typeof window !== 'undefined') {
-      console.warn(
-        `Missing Firebase environment variables: ${missing.join(', ')}. ` +
-          'Using safe placeholders so the app can still render; add valid Firebase values to frontend/.env.local to enable auth and AI features.'
-      );
+  for (const key of requiredEnvVars) {
+    const value = process.env[key];
+
+    if (!value) {
+      missing.push(key);
+      continue;
     }
+
+    if (
+      value.includes('build-placeholder') ||
+      value.includes('REPLACE_WITH_YOUR_') ||
+      value.includes('REPLACE_WITH_LOCAL') ||
+      value.includes('your-project') ||
+      value.includes('placeholder')
+    ) {
+      placeholders.push(key);
+    }
+  }
+
+  const invalid = [...missing, ...placeholders];
+  if (invalid.length > 0) {
+    throw new Error(
+      `Missing or placeholder Firebase environment variables: ${invalid.join(', ')}. ` +
+        'Add the real values to frontend/.env.local or the deployment environment before initializing Firebase.'
+    );
   }
 }
 
@@ -48,12 +61,12 @@ function createFirebaseApp(): FirebaseApp {
   validateFirebaseConfig();
 
   const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'build-placeholder-key',
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'build-placeholder.firebaseapp.com',
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'build-placeholder',
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'build-placeholder.appspot.com',
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '0000000000',
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:0000000000:web:placeholder',
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
   };
 
   // Prevent duplicate initialization (Next.js HMR)

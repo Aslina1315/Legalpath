@@ -21,15 +21,19 @@ describe('Firebase config validation', () => {
     process.env = originalEnv;
   });
 
-  it('warns instead of crashing the browser when required env vars are missing', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('fails clearly when required Firebase config is missing', async () => {
     delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
-    await expect(import('@/lib/firebase/firebase')).resolves.toBeDefined();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Missing Firebase environment variables')
+    await expect(import('@/lib/firebase/firebase')).rejects.toThrow(
+      'Missing or placeholder Firebase environment variables'
     );
+  });
 
-    warnSpy.mockRestore();
+  it('fails clearly when placeholder Firebase config is present', async () => {
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY = 'build-placeholder-key';
+
+    await expect(import('@/lib/firebase/firebase')).rejects.toThrow(
+      'Missing or placeholder Firebase environment variables'
+    );
   });
 });
