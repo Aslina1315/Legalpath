@@ -1,242 +1,224 @@
-# PromptWars — Trusted Legal Access Platform
+#  LegalPath AI
 
-> **Working name**: LegalPath (temporary — change in [`frontend/src/tokens/design.ts`](frontend/src/tokens/design.ts))
-> **Status**: Foundation build — vertical slice 1 in progress
+### AI-Powered Legal Access, Evidence Intelligence & Action Planning
 
----
+> **Understand your situation. Find the relevant legal path. Verify information. Know what to do next.**
 
-## What This Is
+LegalPath AI is a Google-native Generative AI platform designed to make legal information more understandable and actionable for people who may not know where to begin.
 
-An AI-assisted legal access platform built for the PromptWars challenge.
+Instead of functioning as a simple legal chatbot, LegalPath AI turns an unstructured user story into a structured journey:
 
-**Philosophy**: *Tell us what happened. Understand what matters. Know what to do next.*
-
-The application guides users through one continuous intelligent journey — not a collection of disconnected feature tabs. Every visible feature connects to real application logic, Gemini AI, Firebase, and Google services.
+**Story → Understanding → Legal Domain → Jurisdiction → Live Research → Evidence → Verification → Action → Documents → Human Help**
 
 ---
 
-## Quick Start
+## 🚀 Why LegalPath AI?
 
-### Prerequisites
+Legal problems rarely arrive as clean questions.
 
-| Tool | Version |
-|------|---------|
-| Node.js | 18+ |
-| npm | 9+ |
-| Python | 3.11+ |
-| uv | latest |
+People usually start with:
 
-Install `uv` (Python package manager):
-```bash
-# Windows
-winget install --id=astral-sh.uv -e
-# or
-pip install uv
-```
+> "This happened to me. I don't know whether it is legally important, what evidence I need, or where I should go."
 
----
+LegalPath AI is designed to bridge that gap.
 
-### 1. Configure Environment Variables
+The platform combines **Gemini, Google Search grounding, multimodal evidence analysis, structured AI outputs and Firebase** to transform a user's natural-language situation into a guided legal-information workflow.
 
-```bash
-# Frontend
-cp .env.example frontend/.env.local
-# Edit frontend/.env.local with your Firebase config values
+It focuses on:
 
-# Backend
-cp .env.example backend/.env
-# Edit backend/.env with your service configuration
-```
+- Making complex legal information easier to understand
+- Identifying missing facts and evidence
+- Finding relevant, current information
+- Detecting contradictions in submitted evidence
+- Verifying claims before presenting them
+- Turning research into practical next steps
 
-See [`.env.example`](.env.example) for all required variables and where to get them.
-
-> **Firebase App Check (local dev)**: Generate a debug token in Firebase Console → Build → App Check → your web app → Manage debug tokens. Add it as `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN` in `frontend/.env.local`.
+**LegalPath AI provides legal information and guidance, not legal representation or a substitute for a qualified lawyer.**
 
 ---
 
-### 2. Frontend
+# ✨ Core Features
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## 🧠 AI Case Understanding
 
-Opens at [http://localhost:3000](http://localhost:3000)
+Users can describe their situation naturally instead of filling out complicated legal forms.
 
-**Other commands:**
-```bash
-npm run typecheck   # TypeScript check
-npm run lint        # ESLint
-npm run build       # Production build
-npm test            # Jest unit tests
-```
+Gemini analyzes the story and helps extract:
+
+- Key facts
+- Timeline
+- People/entities involved
+- Important events
+- Missing information
+- Urgency indicators
+- Potential legal domains
 
 ---
 
-### 3. Backend
+## 🧭 Domain & Jurisdiction Routing
 
-```bash
-cd backend
-uv sync --dev
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+The system helps determine which legal area and jurisdiction may be relevant based on the information provided.
 
-API available at [http://localhost:8000](http://localhost:8000)  
-Health check: [http://localhost:8000/health](http://localhost:8000/health)  
-OpenAPI docs (dev only): [http://localhost:8000/docs](http://localhost:8000/docs)
-
-**Run tests:**
-```bash
-uv run pytest tests/ -v
-```
+Rather than immediately assuming an answer, the workflow can surface missing information and request clarification where necessary.
 
 ---
 
-## Project Structure
+## 🔎 Live Legal Research
 
-```
-/
-├── frontend/                 # Next.js 14 App Router (TypeScript)
-│   ├── src/
-│   │   ├── app/              # Next.js App Router pages & layouts
-│   │   ├── components/       # Reusable UI components
-│   │   │   ├── ui/           # Design system primitives
-│   │   │   ├── intake/       # Intake workflow components
-│   │   │   ├── layout/       # Shell, nav
-│   │   │   └── providers/    # Firebase, Auth providers
-│   │   ├── lib/
-│   │   │   ├── firebase/     # Firebase initialization & App Check
-│   │   │   └── ai/           # Firebase AI Logic helpers
-│   │   ├── store/            # Zustand state management
-│   │   ├── tokens/           # Design tokens (brand name lives here)
-│   │   └── types/            # TypeScript types (Case, AI states)
-│   └── __tests__/            # Jest unit tests
-│
-├── backend/                  # FastAPI (Python 3.11+)
-│   ├── app/
-│   │   ├── api/              # Route handlers
-│   │   ├── core/             # Security, logging
-│   │   ├── schemas/          # Pydantic models
-│   │   ├── services/         # Business logic (stubs)
-│   │   ├── integrations/     # Firebase Admin, Gemini (stubs)
-│   │   └── utils/            # Validators
-│   └── tests/                # pytest
-│
-├── shared/                   # Language-agnostic schemas & constants
-├── tests/
-│   └── ai-evaluation/        # Adversarial AI test documentation
-├── docs/                     # Architecture & deployment docs
-├── scripts/                  # Dev setup scripts
-├── .env.example              # Environment variable reference
-├── .gitignore
-└── README.md
-```
+LegalPath AI uses **Google Search grounding with Gemini** to retrieve current information rather than relying exclusively on static model knowledge.
+
+Research can support discovery of:
+
+- Relevant laws and rules
+- Official government information
+- Procedures
+- Authorities and resources
+- Important deadlines or requirements
 
 ---
 
-## Technology Stack
+## 📄 Multimodal Evidence Intelligence
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, TypeScript (strict), Tailwind CSS |
-| State | Zustand |
-| Validation | Zod |
-| Firebase | Authentication, Firestore, AI Logic, App Check |
-| AI | Firebase AI Logic → Gemini Developer API |
-| Backend | FastAPI, Pydantic v2, uvicorn |
-| Python tooling | uv, ruff, pytest |
-| Cloud target | Google Cloud Run |
+Users can provide supporting evidence such as:
 
----
+- PDFs
+- Images
+- Documents
+- Screenshots
 
-## Environment Variables
+Gemini's multimodal capabilities can extract relevant information such as:
 
-See [`.env.example`](.env.example) — all variables documented with source instructions.
+- Dates
+- Amounts
+- Parties
+- Statements
+- Clauses
+- Other potentially significant details
 
-**Frontend** (prefix `NEXT_PUBLIC_`):
-- Firebase web app config (6 vars)
-- `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN` — local development App Check
-- `NEXT_PUBLIC_BACKEND_URL` — backend service URL
-
-**Backend**:
-- `ENVIRONMENT`, `LOG_LEVEL`, `DEBUG`
-- `ALLOWED_ORIGINS` — CORS origins
-- `MAX_REQUEST_SIZE_BYTES`, `RATE_LIMIT_PER_MINUTE`
+Evidence is **optional** and does not block the core legal-information workflow.
 
 ---
 
-## Security Principles
+## 🧩 Evidence Gap Detection
 
-- No credentials in source code
-- All Firebase config via `NEXT_PUBLIC_` environment variables
-- Gemini API key managed by Firebase (never in client code)
-- App Check enforces authorized clients
-- Backend: CORS restricted to configured origins, request size limits, rate limiting
-- Structured logging with no sensitive field output
-- See [`docs/security.md`](docs/security.md)
+Instead of simply saying "upload documents", the system identifies what information or evidence may still be missing based on the situation.
 
----
+This helps users understand:
 
-## What's Built Now
-
-### Stage 1 — Foundation ✅
-- [x] Landing shell with "Tell us what happened" intake form
-- [x] Firebase client initialization (Auth, Firestore, App Check)
-- [x] Firebase AI Logic + Gemini integration architecture
-- [x] AI state machine types (`IDLE → UNDERSTANDING → READY → ERROR`)
-- [x] Case data model (TypeScript + Python/Pydantic)
-- [x] FastAPI backend with health endpoint, CORS, rate limiting, structured logging
-- [x] Design token system (colors, typography, spacing, animation)
-- [x] Accessibility foundation (semantic HTML, focus states, reduced-motion)
-- [x] Unit tests (frontend: Jest, backend: pytest)
-
-### Stage 2 — AI Intake + Auth ✅
-- [x] **AI Module 01: Intake Understanding** — real Gemini structured-output call via `firebase/ai`
-- [x] **CaseResultCard** — renders extracted summary, legal domains, key facts, entities, urgency, clarification questions
-- [x] **Google Sign-In** (popup) + **Email/Password** auth flow
-- [x] **AuthModal** — full accessible dialog with mode toggle (sign-in / sign-up)
-- [x] **TopNav** — auth-aware: sign-in button → user avatar → sign-out dropdown
-- [x] **Firestore case creation** helper — `createCase()` with server timestamp
-- [x] Firebase auth helpers with user-friendly error messages
-
-### Stage 3 — Full AI Pipeline + Save + Case View ✅
-- [x] **AI Module 02: Case Structuring** — deeper Gemini call: timeline, entity map, structured facts, evidence gap list
-- [x] **CaseStructureCard** — renders timeline with confidence bars, entity roles, structured facts, evidence available/missing
-- [x] **Two-module pipeline** — Module 01 displays instantly; Module 02 runs in the background; both results shown on completion
-- [x] **SaveCasePrompt** — auto-saves to Firestore (signed-in users) or shows sign-in nudge; navigates to case page after save
-- [x] **`/case/[caseId]`** — protected route showing the full saved case from Firestore (owner-only access)
-- [x] `useCaseStore` extended with `caseId` tracking
-- [x] **28/28 tests passing** (5 suites), TypeScript strict — zero errors
-
-## What's Planned Next
-
-- [ ] AI Module 03: Legal Domain + Jurisdiction Reasoning (with Gemini grounding)
-- [ ] Action Plan view — prioritised next steps for the user
-- [ ] Voice input (Web Speech API / Google STT)
-- [ ] Multi-language support
-- [ ] Firestore security rules deployment
-
-See [`docs/ai-architecture.md`](docs/ai-architecture.md) for the full 13-module AI pipeline plan.
+**What do I already have?  
+What might I need?  
+Why could it matter?**
 
 ---
 
-## Branding
+## ⚠️ Contradiction Analysis
 
-The name **LegalPath** is a temporary placeholder. To rebrand:
-1. Open [`frontend/src/tokens/design.ts`](frontend/src/tokens/design.ts)
-2. Update `BRAND.name` and `BRAND.tagline`
-3. That's it — everything else reads from this single file
+When multiple facts or evidence items are available, the system can identify potential inconsistencies that may require verification.
+
+The goal is not to invent conclusions, but to surface areas that deserve closer review.
 
 ---
 
-## Documentation
+## ✅ Claim-Level Verification
 
-| Doc | Contents |
-|-----|----------|
-| [`docs/architecture.md`](docs/architecture.md) | System architecture |
-| [`docs/ai-architecture.md`](docs/ai-architecture.md) | 13 AI pipeline modules |
-| [`docs/security.md`](docs/security.md) | Security model |
-| [`docs/testing.md`](docs/testing.md) | Test strategy |
-| [`docs/accessibility.md`](docs/accessibility.md) | Accessibility approach |
-| [`docs/deployment.md`](docs/deployment.md) | Cloud Run deployment guide |
+Important information can be separated into individual claims and checked against the available research/evidence context.
+
+This creates a more transparent AI workflow instead of presenting one large unexplained answer.
+
+---
+
+## 🛠️ Action Path
+
+Research becomes useful only when users know what to do next.
+
+LegalPath AI converts the analysis into a structured action path such as:
+
+**Understand → Verify → Collect → Contact → Submit → Follow Up**
+
+The exact path depends on the user's situation.
+
+---
+
+## 📝 Document Assistance
+
+The platform is designed to help users move from understanding their situation toward preparing useful documents and communications based on the information gathered during the journey.
+
+---
+
+## 🌐 Multilingual Accessibility
+
+The experience supports interactions in:
+
+- English
+- Tamil
+- Hindi
+
+The architecture is designed so language selection can influence both user interaction and AI responses.
+
+Voice interaction uses browser-supported speech capabilities with graceful fallback.
+
+---
+
+# 🤖 Generative AI Stack
+
+### Google Gemini 3.8 Flash
+Used as the core intelligence layer for:
+
+- Natural-language understanding
+- Case structuring
+- Legal-domain detection
+- Jurisdiction analysis
+- Research synthesis
+- Evidence analysis
+- Evidence-gap detection
+- Contradiction analysis
+- Claim verification
+- Action planning
+
+### Firebase AI Logic
+Provides the application integration layer for Gemini interactions.
+
+### Google Search Grounding
+Used for current, source-backed information retrieval.
+
+### Gemini Multimodal Capabilities
+Used to analyze uploaded PDF and image evidence.
+
+---
+
+# 🏗️ Architecture
+
+```text
+                    ┌─────────────────────────┐
+                    │       User Story        │
+                    │   Text / Voice Input    │
+                    └────────────┬────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │     Gemini AI Layer     │
+                    │  Understanding +        │
+                    │  Structuring + Routing   │
+                    └────────────┬────────────┘
+                                 │
+                ┌────────────────┼────────────────┐
+                ▼                ▼                ▼
+        ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+        │ Google Search│ │   Evidence   │ │  User Facts  │
+        │  Grounding   │ │  PDF / Image │ │  & Timeline  │
+        └──────┬───────┘ └──────┬───────┘ └──────┬───────┘
+               │                │                │
+               └────────────────┼────────────────┘
+                                ▼
+                    ┌─────────────────────────┐
+                    │ Verification & Analysis │
+                    │ Gaps • Contradictions   │
+                    │ Claims • Confidence     │
+                    └────────────┬────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │      Action Path        │
+                    │ Research → Next Steps   │
+                    │ Documents → Follow-up   │
+                    └─────────────────────────┘
