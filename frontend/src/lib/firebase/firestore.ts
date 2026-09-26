@@ -18,7 +18,7 @@ import {
   type DocumentReference,
   type Timestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { getDbInstance } from './firebase';
 import type { Case, CaseDraft } from '@/types/case';
 
 const CASES_COLLECTION = 'cases';
@@ -33,11 +33,12 @@ const CASES_COLLECTION = 'cases';
  * @param draft   Partial case data (narrative etc.) from intake.
  * @returns       The caseId of the newly created document.
  */
-function requireDb(): NonNullable<typeof db> {
-  if (!db) {
+function requireDb(): NonNullable<ReturnType<typeof getDbInstance>> {
+  const dbInstance = getDbInstance();
+  if (!dbInstance) {
     throw new Error('Firestore is unavailable because Firebase is not configured in this browser session.');
   }
-  return db;
+  return dbInstance;
 }
 
 export async function createCase(

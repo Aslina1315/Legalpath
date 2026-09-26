@@ -57,9 +57,15 @@ export function validateFirebaseConfig(): void {
   }
 }
 
+let cachedApp: FirebaseApp | null = null;
+
 export function getFirebaseApp(): FirebaseApp | null {
   if (typeof window === 'undefined') {
     return null;
+  }
+
+  if (cachedApp) {
+    return cachedApp;
   }
 
   try {
@@ -71,7 +77,8 @@ export function getFirebaseApp(): FirebaseApp | null {
 
   const existingApp = getApps()[0];
   if (existingApp) {
-    return existingApp;
+    cachedApp = existingApp;
+    return cachedApp;
   }
 
   const firebaseConfig = {
@@ -83,9 +90,21 @@ export function getFirebaseApp(): FirebaseApp | null {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
   };
 
-  return initializeApp(firebaseConfig);
+  cachedApp = initializeApp(firebaseConfig);
+  return cachedApp;
 }
 
-export const app: FirebaseApp | null = typeof window === 'undefined' ? null : getFirebaseApp();
-export const auth: Auth | null = app ? getAuth(app) : null;
-export const db: Firestore | null = app ? getFirestore(app) : null;
+export const app: FirebaseApp | null = null;
+
+export function getAuthInstance(): Auth | null {
+  const firebaseApp = getFirebaseApp();
+  return firebaseApp ? getAuth(firebaseApp) : null;
+}
+
+export function getDbInstance(): Firestore | null {
+  const firebaseApp = getFirebaseApp();
+  return firebaseApp ? getFirestore(firebaseApp) : null;
+}
+
+export const auth: Auth | null = null;
+export const db: Firestore | null = null;

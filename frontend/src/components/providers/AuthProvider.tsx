@@ -7,19 +7,20 @@
 
 import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase/firebase';
+import { getAuthInstance } from '@/lib/firebase/firebase';
 import { useAppStore } from '@/store/useAppStore';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setAuthLoading } = useAppStore();
 
   useEffect(() => {
-    if (!auth) {
+    const authInstance = getAuthInstance();
+    if (!authInstance) {
       setAuthLoading(false);
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(authInstance, (user) => {
       setUser(user);
       setAuthLoading(false);
     });

@@ -17,7 +17,7 @@ import {
   updateProfile,
   type UserCredential,
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { getAuthInstance } from './firebase';
 
 // ─── Google ─────────────────────────────────────────────────────────────────
 
@@ -29,11 +29,12 @@ googleProvider.addScope('profile');
  * Opens the Google Sign-In popup.
  * Returns the UserCredential on success.
  */
-function requireAuth(): NonNullable<typeof auth> {
-  if (!auth) {
+function requireAuth(): NonNullable<ReturnType<typeof getAuthInstance>> {
+  const authInstance = getAuthInstance();
+  if (!authInstance) {
     throw new Error('Firebase Auth is unavailable because Firebase is not configured in this browser session.');
   }
-  return auth;
+  return authInstance;
 }
 
 export async function signInWithGoogle(): Promise<UserCredential> {
