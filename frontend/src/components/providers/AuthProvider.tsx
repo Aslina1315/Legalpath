@@ -14,6 +14,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setAuthLoading } = useAppStore();
 
   useEffect(() => {
+    if (!auth) {
+      setAuthLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setAuthLoading(false);

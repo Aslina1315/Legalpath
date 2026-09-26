@@ -25,7 +25,7 @@ const requiredEnvVars = [
   'NEXT_PUBLIC_FIREBASE_APP_ID',
 ] as const;
 
-function validateFirebaseConfig(): void {
+export function validateFirebaseConfig(): void {
   const missing: string[] = [];
   const placeholders: string[] = [];
 
@@ -57,8 +57,22 @@ function validateFirebaseConfig(): void {
   }
 }
 
-function createFirebaseApp(): FirebaseApp {
-  validateFirebaseConfig();
+export function getFirebaseApp(): FirebaseApp | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    validateFirebaseConfig();
+  } catch (error) {
+    console.error('[Firebase] Firebase is not configured for this browser session.', error);
+    return null;
+  }
+
+  const existingApp = getApps()[0];
+  if (existingApp) {
+    return existingApp;
+  }
 
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -69,14 +83,9 @@ function createFirebaseApp(): FirebaseApp {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
   };
 
-  // Prevent duplicate initialization (Next.js HMR)
-  if (getApps().length > 0) {
-    return getApps()[0]!;
-  }
-
   return initializeApp(firebaseConfig);
 }
 
-export const app: FirebaseApp = createFirebaseApp();
-export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app);
+export const app: FirebaseApp | null = typeof window === 'undefined' ? null : getFirebaseApp();
+export const auth: Auth | null = app ? getAuth(app) : null;
+export const db: Firestore | null = app ? getFirestore(app) : null;

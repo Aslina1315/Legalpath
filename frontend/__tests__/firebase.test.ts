@@ -1,13 +1,14 @@
 /**
  * Firebase initialization tests.
- * Verifies module loads and basic shape without requiring real credentials.
+ * Verifies validation behavior without importing the browser-only Firebase boot path.
  */
+
+import { validateFirebaseConfig } from '@/lib/firebase/firebase';
 
 describe('Firebase config validation', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
     process.env = { ...originalEnv };
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY = 'test-api-key';
     process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = 'test.firebaseapp.com';
@@ -21,18 +22,18 @@ describe('Firebase config validation', () => {
     process.env = originalEnv;
   });
 
-  it('fails clearly when required Firebase config is missing', async () => {
+  it('fails clearly when required Firebase config is missing', () => {
     delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
-    await expect(import('@/lib/firebase/firebase')).rejects.toThrow(
+    expect(() => validateFirebaseConfig()).toThrow(
       'Missing or placeholder Firebase environment variables'
     );
   });
 
-  it('fails clearly when placeholder Firebase config is present', async () => {
+  it('fails clearly when placeholder Firebase config is present', () => {
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY = 'build-placeholder-key';
 
-    await expect(import('@/lib/firebase/firebase')).rejects.toThrow(
+    expect(() => validateFirebaseConfig()).toThrow(
       'Missing or placeholder Firebase environment variables'
     );
   });

@@ -14,7 +14,7 @@
  */
 
 import { initializeAppCheck, CustomProvider, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
-import { app } from './firebase';
+import { app, getFirebaseApp } from './firebase';
 
 let appCheckInitialized = false;
 
@@ -22,17 +22,20 @@ export function initAppCheck(): void {
   if (typeof window === 'undefined') return; // Server-side: skip
   if (appCheckInitialized) return; // Already initialized
 
+  const firebaseApp = app ?? getFirebaseApp();
+  if (!firebaseApp) {
+    console.warn('[AppCheck] Firebase is unavailable in this browser context; App Check was not initialized.');
+    return;
+  }
+
   const debugToken = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
   const recaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY;
 
   if (debugToken) {
-    // Development: inject debug token via Firebase's global mechanism
-    // This is the documented Firebase approach for local development
     (window as Window & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
       debugToken;
 
-    // Use a CustomProvider that returns the debug token
-    initializeAppCheck(app, {
+    initializeAppCheck(firebaseApp, {
       provider: new CustomProvider({
         getToken: async () => ({
           token: debugToken,
@@ -44,16 +47,13 @@ export function initAppCheck(): void {
 
     console.debug('[AppCheck] Initialized with debug token (development mode)');
   } else if (recaptchaKey) {
-    // Production: reCAPTCHA Enterprise
-    initializeAppCheck(app, {
+    initializeAppCheck(firebaseApp, {
       provider: new ReCaptchaEnterpriseProvider(recaptchaKey),
       isTokenAutoRefreshEnabled: true,
     });
 
     console.debug('[AppCheck] Initialized with reCAPTCHA Enterprise (production mode)');
   } else {
-    // Neither key provided: warn but don't crash
-    // Firebase AI Logic calls will fail until App Check is configured
     console.warn(
       '[AppCheck] Neither NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN nor NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY is set. ' +
       'Firebase AI Logic calls will not be authorized. ' +

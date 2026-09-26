@@ -7,7 +7,7 @@
  */
 
 import { getAI, GoogleAIBackend } from 'firebase/ai';
-import { app } from '@/lib/firebase/firebase';
+import { app, getFirebaseApp } from '@/lib/firebase/firebase';
 
 let _aiInstance: ReturnType<typeof getAI> | null = null;
 
@@ -21,8 +21,13 @@ export function getAIInstance(): ReturnType<typeof getAI> {
     throw new Error('Firebase AI Logic must be called from a client context.');
   }
 
+  const firebaseApp = app ?? getFirebaseApp();
+  if (!firebaseApp) {
+    throw new Error('Firebase AI Logic is unavailable because Firebase is not configured in this browser session.');
+  }
+
   if (!_aiInstance) {
-    _aiInstance = getAI(app, { backend: new GoogleAIBackend() });
+    _aiInstance = getAI(firebaseApp, { backend: new GoogleAIBackend() });
   }
 
   return _aiInstance;

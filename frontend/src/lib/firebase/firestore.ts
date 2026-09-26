@@ -33,11 +33,19 @@ const CASES_COLLECTION = 'cases';
  * @param draft   Partial case data (narrative etc.) from intake.
  * @returns       The caseId of the newly created document.
  */
+function requireDb(): NonNullable<typeof db> {
+  if (!db) {
+    throw new Error('Firestore is unavailable because Firebase is not configured in this browser session.');
+  }
+  return db;
+}
+
 export async function createCase(
   userId: string,
   draft: Omit<CaseDraft, 'caseId' | 'userId'>
 ): Promise<string> {
-  const ref: DocumentReference = doc(collection(db, CASES_COLLECTION));
+  const currentDb = requireDb();
+  const ref: DocumentReference = doc(collection(currentDb, CASES_COLLECTION));
   const caseId = ref.id;
 
   const now = new Date().toISOString();
@@ -87,7 +95,8 @@ export async function updateCase(
   caseId: string,
   patch: Partial<Case>
 ): Promise<void> {
-  const ref = doc(db, CASES_COLLECTION, caseId);
+  const currentDb = requireDb();
+  const ref = doc(currentDb, CASES_COLLECTION, caseId);
   await setDoc(
     ref,
     {
@@ -106,7 +115,8 @@ export async function updateCase(
  * Returns null if the document does not exist.
  */
 export async function getCaseById(caseId: string): Promise<Case | null> {
-  const ref = doc(db, CASES_COLLECTION, caseId);
+  const currentDb = requireDb();
+  const ref = doc(currentDb, CASES_COLLECTION, caseId);
   const snap = await getDoc(ref);
 
   if (!snap.exists()) return null;
@@ -122,8 +132,9 @@ export async function getCaseById(caseId: string): Promise<Case | null> {
  * Deletes a case from Firestore.
  */
 export async function deleteCase(caseId: string): Promise<void> {
+  const currentDb = requireDb();
   const { deleteDoc } = await import('firebase/firestore');
-  const ref = doc(db, CASES_COLLECTION, caseId);
+  const ref = doc(currentDb, CASES_COLLECTION, caseId);
   await deleteDoc(ref);
 }
 

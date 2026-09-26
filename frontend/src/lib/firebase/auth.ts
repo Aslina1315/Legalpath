@@ -29,8 +29,15 @@ googleProvider.addScope('profile');
  * Opens the Google Sign-In popup.
  * Returns the UserCredential on success.
  */
+function requireAuth(): NonNullable<typeof auth> {
+  if (!auth) {
+    throw new Error('Firebase Auth is unavailable because Firebase is not configured in this browser session.');
+  }
+  return auth;
+}
+
 export async function signInWithGoogle(): Promise<UserCredential> {
-  return signInWithPopup(auth, googleProvider);
+  return signInWithPopup(requireAuth(), googleProvider);
 }
 
 // ─── Email + Password ────────────────────────────────────────────────────────
@@ -44,7 +51,8 @@ export async function signUpWithEmail(
   password: string,
   displayName?: string
 ): Promise<UserCredential> {
-  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  const currentAuth = requireAuth();
+  const credential = await createUserWithEmailAndPassword(currentAuth, email, password);
   if (displayName && credential.user) {
     await updateProfile(credential.user, { displayName });
   }
@@ -58,7 +66,7 @@ export async function signInWithEmail(
   email: string,
   password: string
 ): Promise<UserCredential> {
-  return signInWithEmailAndPassword(auth, email, password);
+  return signInWithEmailAndPassword(requireAuth(), email, password);
 }
 
 // ─── Sign-out ────────────────────────────────────────────────────────────────
@@ -67,7 +75,7 @@ export async function signInWithEmail(
  * Signs out the current user.
  */
 export async function signOut(): Promise<void> {
-  return firebaseSignOut(auth);
+  return firebaseSignOut(requireAuth());
 }
 
 // ─── Error helpers ───────────────────────────────────────────────────────────
