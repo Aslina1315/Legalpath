@@ -45,23 +45,27 @@ function Input({ label, error, id, ...props }: InputProps) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-sm font-medium text-neutral-700">
+      <label htmlFor={inputId} className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
         {label}
       </label>
       <input
         id={inputId}
         className={[
-          'rounded-md border px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400',
+          'rounded-xl px-3 py-2.5 text-sm',
           'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
           'disabled:opacity-50 disabled:cursor-not-allowed',
-          error ? 'border-red-400 bg-red-50' : 'border-neutral-300 bg-white',
         ].join(' ')}
+        style={{
+          background: 'var(--color-bg-elevated)',
+          border: `1px solid ${error ? 'rgba(248, 113, 113, 0.4)' : 'var(--color-border)'}`,
+          color: 'var(--color-text-primary)',
+        }}
         aria-describedby={error ? `${inputId}-error` : undefined}
         aria-invalid={!!error}
         {...props}
       />
       {error && (
-        <p id={`${inputId}-error`} className="text-xs text-red-600" role="alert">
+        <p id={`${inputId}-error`} className="text-xs text-trust-red" role="alert">
           {error}
         </p>
       )}
@@ -155,7 +159,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md"
         aria-hidden="true"
         onClick={onClose}
       />
@@ -166,16 +170,22 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl p-6 focus:outline-none"
+        style={{
+          background: 'rgba(15, 16, 35, 0.95)',
+          border: '1px solid var(--color-border-accent)',
+          boxShadow: 'var(--glow-card-hover)',
+        }}
         tabIndex={-1}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 id="auth-modal-title" className="text-lg font-semibold text-neutral-900">
+          <h2 id="auth-modal-title" className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="rounded p-1 text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="rounded p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
             aria-label="Close"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -201,9 +211,9 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
 
         {/* Divider */}
         <div className="my-4 flex items-center gap-3" aria-hidden="true">
-          <div className="h-px flex-1 bg-neutral-200" />
-          <span className="text-xs text-neutral-400">or</span>
-          <div className="h-px flex-1 bg-neutral-200" />
+          <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>or</span>
+          <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
         </div>
 
         {/* Email/password form */}
@@ -243,7 +253,15 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
           />
 
           {error && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            <p
+              className="rounded-xl px-3 py-2 text-sm"
+              role="alert"
+              style={{
+                background: 'rgba(248, 113, 113, 0.06)',
+                border: '1px solid rgba(248, 113, 113, 0.15)',
+                color: '#f87171',
+              }}
+            >
               {error}
             </p>
           )}
@@ -262,13 +280,14 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
         </form>
 
         {/* Mode toggle */}
-        <p className="mt-4 text-center text-sm text-neutral-500">
+        <p className="mt-4 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
           {mode === 'signup' ? (
             <>
               Already have an account?{' '}
               <button
                 onClick={() => setMode('signin')}
-                className="font-medium text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded"
+                className="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded"
+                style={{ color: '#a78bfa' }}
                 type="button"
               >
                 Sign in

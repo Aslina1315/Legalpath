@@ -14,6 +14,7 @@ import { STRUCTURED_MODEL } from './models';
 import { PROMPTS } from './prompts';
 import { EvidenceAnalysisZodSchema, EVIDENCE_ANALYSIS_FIREBASE_SCHEMA } from './schemas';
 import { buildMultimodalParts, validateInlineFileSize } from './multimodalHelper';
+import { executeWithGemini429Handling } from './structuredOutputHelper';
 import type { EvidenceAnalysisResult } from '@/types/ai';
 import type { AIStructuredResponse } from '@/types/ai';
 
@@ -115,7 +116,7 @@ ${caseNarrative ? caseNarrative.trim().slice(0, 1000) : 'No narrative provided.'
     safetySettings: STRUCTURED_MODEL.safetySettings,
   });
 
-  const result = await model.generateContent(parts);
+  const result = await executeWithGemini429Handling(() => model.generateContent(parts));
   const responseText = result.response.text();
 
   let parsed: unknown;

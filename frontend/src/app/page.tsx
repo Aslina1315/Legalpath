@@ -1,42 +1,78 @@
+/**
+ * HomePage — Premium AI Legal Access Landing Experience.
+ *
+ * Requirements:
+ * - Headline:
+ *     "Understand what happened.
+ *      Know what to do next."
+ * - Supporting text:
+ *     "Tell us your situation in your own words. We'll help organize the details,
+ *      check current information, review your evidence, and build a clear next-step path."
+ * - Primary interaction: Large premium conversational input surface via <IntakeForm />
+ * - Refined editorial typography & subtle depth
+ */
+
+'use client';
+
 import { IntakeForm } from '@/components/intake/IntakeForm';
-import { BRAND } from '@/tokens/design';
+import { useAppStore } from '@/store/useAppStore';
+import { getTranslation } from '@/lib/i18n';
 
 export default function HomePage() {
+  const { language } = useAppStore();
+  const t = getTranslation(language);
+
   return (
     <section
-      className="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-24 animate-fade-in"
+      className="relative mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-20 animate-fade-in"
       aria-labelledby="hero-heading"
     >
-      {/* Hero */}
-      <div className="mb-12 space-y-4">
+      {/* ═══ Editorial Hero Header ═══ */}
+      <div className="mb-12 sm:mb-16 space-y-6 text-center max-w-3xl mx-auto">
+        {/* Subtle Intelligence Beacon Badge */}
+        <div className="flex justify-center">
+          <span
+            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-mono font-semibold tracking-wider uppercase"
+            style={{
+              background: 'rgba(99, 102, 241, 0.08)',
+              color: 'var(--color-text-accent)',
+              border: '1px solid rgba(129, 140, 248, 0.2)',
+            }}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+            </span>
+            AI-POWERED LEGAL INTELLIGENCE
+          </span>
+        </div>
+
+        {/* Editorial Headline */}
         <h1
           id="hero-heading"
-          className="text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl"
-          style={{ lineHeight: '1.15' }}
+          className="editorial-headline text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-white font-editorial"
         >
-          Tell us what{' '}
-          <span className="text-brand-600">happened.</span>
+          <span className="block">{t.headlineLine1}</span>
+          <span
+            className="block mt-1 font-serif italic"
+            style={{
+              background: 'linear-gradient(135deg, #c7d2fe 0%, #818cf8 60%, #a78bfa 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            {t.headlineLine2}
+          </span>
         </h1>
-        <p className="text-lg text-neutral-600 leading-relaxed max-w-xl">
-          {BRAND.tagline}
+
+        {/* Supporting Text */}
+        <p className="mx-auto max-w-2xl text-base sm:text-lg leading-relaxed text-slate-300">
+          {t.subText}
         </p>
       </div>
 
-      {/* Intake form */}
+      {/* ═══ Conversational Intake & Living Journey Experience ═══ */}
       <IntakeForm />
-
-      {/* Trust statement */}
-      <div className="mt-12 flex items-start gap-3 rounded-lg bg-neutral-50 px-4 py-4">
-        <span className="mt-0.5 text-trust-green" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        </span>
-        <p className="text-sm text-neutral-600">
-          <strong className="font-semibold text-neutral-800">Your information is private.</strong>{' '}
-          What you share is used only to help structure your situation. We never share your details with third parties.
-        </p>
-      </div>
     </section>
   );
 }

@@ -32,13 +32,13 @@ export interface CaseEntity {
   id: string;
   name: string;
   role: 'CLAIMANT' | 'RESPONDENT' | 'WITNESS' | 'THIRD_PARTY' | 'INSTITUTION' | 'OTHER';
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface TimelineEvent {
   id: string;
-  date?: string;
-  approximateDate?: string;
+  date?: string | null;
+  approximateDate?: string | null;
   description: string;
   confidence: number;
 }
@@ -110,13 +110,16 @@ import type {
   ContradictionResult,
   ResponseVerificationResult,
   ActionPathResult,
+  DocumentDraftResult,
+  BeforeSendReviewResult,
+  HumanHelpBridgeResult,
 } from './ai';
 
 /** Root case document — mirrors future Firestore document structure */
 export interface Case {
   caseId: string;
   userId: string;
-  jurisdiction?: string;
+  jurisdiction?: string | null;
   narrative: string;
   status: CaseStatus;
   timestamps: CaseTimestamps;
@@ -142,6 +145,9 @@ export interface Case {
   contradictionAnalysis?: ContradictionResult;
   responseVerification?: ResponseVerificationResult;
   actionPath?: ActionPathResult;
+  generatedDocument?: DocumentDraftResult;
+  beforeSendReview?: BeforeSendReviewResult;
+  humanHelpBridge?: HumanHelpBridgeResult;
 
   // Metadata
   language?: string; // BCP-47 language tag

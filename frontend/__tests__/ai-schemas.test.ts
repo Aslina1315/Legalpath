@@ -69,6 +69,20 @@ describe('CaseIntakeZodSchema', () => {
     expect(() => CaseIntakeZodSchema.parse(valid)).not.toThrow();
   });
 
+  it('accepts null detectedJurisdiction when Gemini cannot determine it', () => {
+    const validWithNull = {
+      summary: 'Contract dispute with vendor.',
+      detectedJurisdiction: null,
+      legalDomains: ['contract'],
+      keyFacts: ['Vendor failed to deliver goods'],
+      entities: [],
+      urgencyLevel: 'MEDIUM',
+      clarificationNeeded: ['Where did the transaction take place?'],
+    };
+    const parsed = CaseIntakeZodSchema.parse(validWithNull);
+    expect(parsed.detectedJurisdiction).toBeNull();
+  });
+
   it('rejects an invalid urgency level', () => {
     const invalid = {
       summary: 'x',

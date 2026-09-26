@@ -12,6 +12,9 @@ import { runEvidenceGapDetection } from '@/lib/ai/evidenceGapModule';
 import { runContradictionDetection } from '@/lib/ai/contradictionModule';
 import { runResponseVerification } from '@/lib/ai/responseVerifierModule';
 import { runActionPathPlan } from '@/lib/ai/actionPathModule';
+import { runDocumentGeneration } from '@/lib/ai/documentGeneratorModule';
+import { runBeforeSendReview } from '@/lib/ai/beforeSendReviewModule';
+import { resolveHumanHelpResources } from '@/lib/ai/humanHelpModule';
 
 describe('Continuous AI Pipeline Integration', () => {
   afterEach(() => {
@@ -151,6 +154,71 @@ describe('Continuous AI Pipeline Integration', () => {
       possibleEscalation: [],
     };
 
+    // Stage 11: Document Generator mock response
+    const documentMock = {
+      documentId: 'doc-pipeline-1',
+      title: 'Demand for Return of Security Deposit',
+      documentType: 'demand_letter' as const,
+      recipientRoleOrTitle: 'Landlord Management',
+      jurisdiction: 'Texas, United States',
+      sections: [
+        {
+          id: 'sec-1',
+          heading: 'Factual Background',
+          category: 'USER_PROVIDED_FACT' as const,
+          content: 'Surrendered unit on May 31, 2024. $1500 deposit withheld.',
+          isCustomizable: true,
+        },
+        {
+          id: 'sec-2',
+          heading: 'Governing Texas Statute',
+          category: 'VERIFIED_SOURCE_INFO' as const,
+          content: 'Texas Property Code § 92.103 requires refund within 30 days.',
+          sourceRef: 'Texas Property Code Section 92.103',
+          isCustomizable: true,
+        },
+      ],
+      userProvidedFactsSummary: ['$1500 deposit withheld'],
+      verifiedSourceInformation: [
+        {
+          citation: 'Tex. Prop. Code § 92.103',
+          principle: '30-day refund requirement',
+        },
+      ],
+      aiGeneratedWordingNotice: 'Drafted by AI legal access tool.',
+      uncertainOrMissingInformation: [],
+      formalNoticeDisclaimer: 'Not formal legal representation.',
+      generatedAt: '2026-09-25T10:00:00Z',
+    };
+
+    // Stage 12: Before-You-Send Review mock response
+    const beforeSendReviewMock = {
+      verdict: 'READY' as const,
+      summary: 'All claims are consistent with case facts and grounded in Texas statutes.',
+      checklist: [
+        {
+          id: 'chk-1',
+          category: 'FACTUAL_CONSISTENCY' as const,
+          label: 'Factual Consistency',
+          passed: true,
+          severity: 'PASS' as const,
+          details: 'Facts match narrative and lease.',
+        },
+        {
+          id: 'chk-2',
+          category: 'UNSUPPORTED_CLAIMS' as const,
+          label: 'Source Grounding',
+          passed: true,
+          severity: 'PASS' as const,
+          details: 'Grounded in Texas Property Code § 92.103.',
+        },
+      ],
+      blockers: [],
+      warnings: [],
+      confirmationsNeeded: ['Confirm date forwarding address provided.'],
+      reviewedAt: '2026-09-25T10:05:00Z',
+    };
+
     // Sequentially mock each Gemini call
     const mockResponses = [
       intakeMock,
@@ -161,6 +229,8 @@ describe('Continuous AI Pipeline Integration', () => {
       contradictionsMock,
       verificationMock,
       actionPathMock,
+      documentMock,
+      beforeSendReviewMock,
     ];
 
     let callCount = 0;
@@ -189,7 +259,7 @@ describe('Continuous AI Pipeline Integration', () => {
     const step3 = await runDomainRouting({
       narrative,
       facts: step2.data.structuredFacts.map((f) => f.text),
-      locationHint: step1.data.detectedJurisdiction,
+      locationHint: step1.data.detectedJurisdiction ?? undefined,
     });
     expect(step3.data.domain).toBe('Housing & Tenancy');
 
@@ -198,7 +268,7 @@ describe('Continuous AI Pipeline Integration', () => {
       structuredFacts: step2.data.structuredFacts,
       domain: step3.data.domain,
       subDomain: step3.data.subDomain,
-      jurisdiction: step3.data.jurisdiction,
+      jurisdiction: step3.data.jurisdiction ?? undefined,
     });
     expect(step5.data.sources).toHaveLength(1);
 
@@ -225,7 +295,7 @@ describe('Continuous AI Pipeline Integration', () => {
       draftResponse: 'Landlord must refund within 30 days under Texas law.',
       retrievedKnowledge: step5.data,
       structuredFacts: step2.data.structuredFacts,
-      jurisdiction: step3.data.jurisdiction,
+      jurisdiction: step3.data.jurisdiction ?? undefined,
     });
     expect(step9.data.overallTrustScore).toBe(0.9);
 
@@ -236,12 +306,43 @@ describe('Continuous AI Pipeline Integration', () => {
       evidenceGaps: step7.data,
       contradictions: step8.data,
       domain: step3.data.domain,
-      jurisdiction: step3.data.jurisdiction,
+      jurisdiction: step3.data.jurisdiction ?? undefined,
     });
     expect(step10.data.nextSteps).toHaveLength(1);
     expect(step10.data.nextSteps[0].priority).toBe('URGENT');
 
-    // Pipeline ran all 8 AI stages coherently
-    expect(callCount).toBe(8);
+    // Step 11: Document Generation (Phase 2)
+    const step11 = await runDocumentGeneration({
+      documentType: 'demand_letter',
+      jurisdiction: step3.data.jurisdiction || 'Austin, Texas',
+      userProvidedFacts: step2.data.structuredFacts.map((f) => f.text),
+      verifiedSources: step5.data.sources,
+      actionPath: step10.data,
+    });
+    expect(step11.data.title).toBe('Demand for Return of Security Deposit');
+    expect(step11.data.sections).toHaveLength(2);
+    expect(step11.data.sections[0].category).toBe('USER_PROVIDED_FACT');
+    expect(step11.data.sections[1].category).toBe('VERIFIED_SOURCE_INFO');
+
+    // Step 12: Before-You-Send Review (Phase 3)
+    const step12 = await runBeforeSendReview({
+      documentDraft: step11.data,
+      caseFacts: step2.data.structuredFacts.map((f) => f.text),
+      verifiedSources: step5.data.sources,
+      jurisdiction: step3.data.jurisdiction || 'Austin, Texas',
+    });
+    expect(step12.data.verdict).toBe('READY');
+    expect(step12.data.checklist).toHaveLength(2);
+
+    // Step 13: Human Help Bridge (Phase 4)
+    const humanHelp = resolveHumanHelpResources({
+      jurisdiction: step3.data.jurisdiction ?? undefined,
+      domain: step3.data.domain,
+    });
+    expect(humanHelp.officialResources.length).toBeGreaterThan(0);
+    expect(humanHelp.headline).toBe('AI has reached the point where human help may be useful.');
+
+    // Continuous pipeline ran all 10 AI stages seamlessly
+    expect(callCount).toBe(10);
   });
 });

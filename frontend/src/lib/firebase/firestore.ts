@@ -65,6 +65,9 @@ export async function createCase(
     contradictions: draft.contradictions,
     responseVerification: draft.responseVerification,
     actionPath: draft.actionPath,
+    generatedDocument: draft.generatedDocument,
+    beforeSendReview: draft.beforeSendReview,
+    humanHelpBridge: draft.humanHelpBridge,
     aiPipelineVersion: draft.aiPipelineVersion ?? '3.0',
   };
 
@@ -114,3 +117,13 @@ export async function getCaseById(caseId: string): Promise<Case | null> {
   void _ignored;
   return caseData;
 }
+
+/**
+ * Deletes a case from Firestore.
+ */
+export async function deleteCase(caseId: string): Promise<void> {
+  const { deleteDoc } = await import('firebase/firestore');
+  const ref = doc(db, CASES_COLLECTION, caseId);
+  await deleteDoc(ref);
+}
+

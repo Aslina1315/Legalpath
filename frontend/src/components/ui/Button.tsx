@@ -1,5 +1,5 @@
 /**
- * Accessible Button component.
+ * Accessible Button component — Premium dark variant.
  * Supports variants, sizes, loading state, and keyboard navigation.
  */
 
@@ -40,30 +40,30 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={clsx(
           // Base
           'inline-flex items-center justify-center gap-2',
-          'rounded-lg font-medium transition-all duration-150',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+          'rounded-xl font-semibold transition-all duration-200',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-primary',
           'motion-reduce:transition-none',
           // Disabled
-          isDisabled && 'cursor-not-allowed opacity-60',
+          isDisabled && 'cursor-not-allowed opacity-50',
           // Variants
           variant === 'primary' && [
-            'bg-brand-500 text-white',
-            'hover:bg-brand-600 active:bg-brand-700',
+            'text-white shadow-glow-sm',
+            'hover:shadow-glow-md hover:brightness-110 active:brightness-95',
             'focus-visible:ring-brand-500',
           ],
           variant === 'secondary' && [
-            'bg-neutral-100 text-neutral-800 border border-neutral-200',
-            'hover:bg-neutral-200 active:bg-neutral-300',
+            'text-neutral-100 border',
+            'hover:brightness-110 active:brightness-95',
             'focus-visible:ring-brand-500',
           ],
           variant === 'outline' && [
-            'bg-white text-neutral-700 border border-neutral-300',
-            'hover:bg-neutral-50 hover:border-neutral-400 active:bg-neutral-100',
+            'border transition-colors',
+            'hover:border-brand-500/40 active:border-brand-500/60',
             'focus-visible:ring-brand-500',
           ],
           variant === 'ghost' && [
-            'bg-transparent text-neutral-700',
-            'hover:bg-neutral-100 active:bg-neutral-200',
+            'bg-transparent',
+            'hover:bg-white/5 active:bg-white/10',
             'focus-visible:ring-brand-500',
           ],
           variant === 'danger' && [
@@ -72,11 +72,28 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             'focus-visible:ring-trust-red',
           ],
           // Sizes
-          size === 'sm' && 'px-3 py-1.5 text-sm',
-          size === 'md' && 'px-4 py-2.5 text-sm',
-          size === 'lg' && 'px-6 py-3 text-base',
+          size === 'sm' && 'px-4 py-2 text-sm',
+          size === 'md' && 'px-5 py-2.5 text-sm',
+          size === 'lg' && 'px-7 py-3.5 text-base',
           className
         )}
+        style={{
+          ...(variant === 'primary' ? {
+            background: 'var(--gradient-brand)',
+          } : {}),
+          ...(variant === 'secondary' ? {
+            background: 'rgba(99, 102, 241, 0.1)',
+            borderColor: 'rgba(99, 102, 241, 0.2)',
+          } : {}),
+          ...(variant === 'outline' ? {
+            background: 'transparent',
+            color: 'var(--color-text-secondary)',
+            borderColor: 'var(--color-border)',
+          } : {}),
+          ...(variant === 'ghost' ? {
+            color: 'var(--color-text-secondary)',
+          } : {}),
+        }}
         {...props}
       >
         {isLoading ? (
@@ -96,11 +113,11 @@ Button.displayName = 'Button';
 
 function LoadingDots() {
   return (
-    <span className="flex gap-0.5" aria-hidden="true">
+    <span className="flex gap-1" aria-hidden="true">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="block h-1 w-1 rounded-full bg-current animate-pulse-soft"
+          className="block h-1.5 w-1.5 rounded-full bg-current animate-pulse-soft"
           style={{ animationDelay: `${i * 0.15}s` }}
         />
       ))}

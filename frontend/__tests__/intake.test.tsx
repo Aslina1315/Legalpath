@@ -39,7 +39,8 @@ describe('IntakeForm', () => {
 
   it('renders the submit button', () => {
     render(<IntakeForm />);
-    expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start with my story/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue without evidence/i })).toBeInTheDocument();
   });
 
   it('shows validation error when text is too short', async () => {
@@ -48,7 +49,7 @@ describe('IntakeForm', () => {
 
     const textarea = screen.getByRole('textbox', { name: /what happened/i });
     await user.type(textarea, 'short');
-    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /start with my story/i }));
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });

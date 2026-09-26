@@ -1,15 +1,18 @@
 /**
- * ContradictionsCard — Renders AI Module 08 Contradiction Detector.
+ * ContradictionsCard — Calm, Human-Centered Discrepancy Resolution (AI Module 08).
  *
- * Impartially surfaces factual clashes between narrative and documents,
- * providing the user an interactive form to clarify without silent assumptions.
+ * Design:
+ * - "Your timeline has one detail that needs clarification."
+ * - Side-by-side visual comparison: "Your statement" vs "Document" (e.g. June 10 vs June 18)
+ * - "Which one is correct?" with calm, intuitive resolution choices.
+ * - Calm, non-alarmist amber & slate palette — no frightening red walls.
  */
 
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import type { ContradictionResult } from '@/types/ai';
+import React, { useState } from 'react';
+import { clsx } from 'clsx';
+import type { ContradictionResult, ContradictionItem } from '@/types/ai';
 
 interface ContradictionsCardProps {
   contradictionResult: ContradictionResult;
@@ -19,145 +22,242 @@ interface ContradictionsCardProps {
   userClarifications?: Record<string, string>;
 }
 
-export function ContradictionsCard({
+export const ContradictionsCard: React.FC<ContradictionsCardProps> = ({
   contradictionResult,
   onClarify,
   onClarificationSubmit,
   savedClarifications = {},
   userClarifications = {},
-}: ContradictionsCardProps) {
-  const normalizedResult = contradictionResult;
-
+}) => {
   const [activeClarifications, setActiveClarifications] = useState<Record<string, string>>({
     ...savedClarifications,
     ...userClarifications,
   });
 
-  function handleSaveClarification(id: string) {
-    const text = activeClarifications[id];
-    if (!text || !text.trim()) return;
-    onClarify?.(id, text.trim());
-    onClarificationSubmit?.(id, text.trim());
-  }
+  const [customInputOpen, setCustomInputOpen] = useState<Record<string, boolean>>({});
+
+  const handleSelectOption = (item: ContradictionItem, choiceValue: string, label: string) => {
+    const text = `${label}: ${choiceValue}`;
+    setActiveClarifications((prev) => ({ ...prev, [item.id]: text }));
+    onClarify?.(item.id, text);
+    onClarificationSubmit?.(item.id, text);
+  };
+
+  const handleCustomSubmit = (itemId: string) => {
+    const val = activeClarifications[itemId]?.trim();
+    if (!val) return;
+    onClarify?.(itemId, val);
+    onClarificationSubmit?.(itemId, val);
+  };
+
+  const hasContradictions = contradictionResult.hasContradictions && contradictionResult.contradictions.length > 0;
 
   return (
     <article
-      className="rounded-xl border border-neutral-200 bg-white shadow-sm animate-fade-in overflow-hidden"
+      className="glass-card-static animate-fade-in overflow-hidden"
       aria-labelledby="contradictions-heading"
     >
-      <div className="border-b border-neutral-100 bg-neutral-50/50 px-5 py-3.5 flex items-center justify-between flex-wrap gap-2">
+      {/* Header */}
+      <div
+        className="px-5 py-4 flex items-center justify-between flex-wrap gap-2"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-purple-600">
-            Module 08 · Consistency Cross-Check
+          <span
+            className="text-[10px] font-mono font-semibold uppercase tracking-widest text-amber-400"
+          >
+            Module 08 · Clarity &amp; Consistency
           </span>
-          <h3 id="contradictions-heading" className="text-sm font-semibold text-neutral-800">
-            Contradiction &amp; Discrepancy Detection
+          <h3
+            id="contradictions-heading"
+            className="text-sm font-bold mt-0.5 text-white"
+          >
+            Discrepancy &amp; Timeline Verification
           </h3>
         </div>
+
         <span
-          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-            normalizedResult.hasContradictions
-              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-              : 'bg-emerald-50 text-emerald-700'
-          }`}
+          className={clsx(
+            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-mono font-semibold',
+            hasContradictions
+              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+              : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+          )}
         >
-          {normalizedResult.hasContradictions
-            ? `⚠️ ${normalizedResult.contradictions.length} Discrepancy Flagged`
-            : '✓ Consistent'}
+          {hasContradictions
+            ? `CLARIFICATION NEEDED (${contradictionResult.contradictions.length})`
+            : '✓ FULLY CONSISTENT'}
         </span>
       </div>
 
-      <div className="p-5 space-y-4">
-        <p className="text-sm text-neutral-700 leading-relaxed bg-neutral-50 rounded-lg p-3 border border-neutral-100">
-          {normalizedResult.summary}
-        </p>
+      <div className="p-5 sm:p-6 space-y-5">
+        {/* Calm Intro Banner */}
+        <div className="rounded-xl p-4 bg-slate-900/50 border border-indigo-950/80 text-xs text-slate-300 leading-relaxed">
+          {hasContradictions ? (
+            <p>
+              <strong className="text-white font-medium">Your timeline has details that benefit from clarification.</strong>{' '}
+              {contradictionResult.summary ||
+                'Resolving these differences early strengthens your legal grounding before official requests are prepared.'}
+            </p>
+          ) : (
+            <p className="text-emerald-300 flex items-center gap-2">
+              <span>✓</span>
+              <span>All narrative facts, dates, and documents align with full internal consistency.</span>
+            </p>
+          )}
+        </div>
 
-        {normalizedResult.hasContradictions ? (
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-              Discrepancies Requiring Clarification
-            </h4>
-            {normalizedResult.contradictions.map((contra) => {
-              const isResolved = Boolean(savedClarifications[contra.id]);
+        {/* Contradiction Cards */}
+        {hasContradictions && (
+          <div className="space-y-4">
+            {contradictionResult.contradictions.map((contra) => {
+              const currentResolution = activeClarifications[contra.id];
+              const isResolved = Boolean(currentResolution);
 
               return (
                 <div
                   key={contra.id}
-                  className={`rounded-lg border p-4 space-y-3 transition-colors ${
+                  className={clsx(
+                    'rounded-2xl p-5 border transition-all duration-300 space-y-4',
                     isResolved
-                      ? 'border-emerald-200 bg-emerald-50/20'
-                      : 'border-amber-200 bg-amber-50/20'
-                  }`}
+                      ? 'bg-slate-900/40 border-emerald-500/20'
+                      : 'bg-slate-950/60 border-amber-500/20 hover:border-amber-500/35'
+                  )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-neutral-800 uppercase tracking-wide">
-                      Field: {contra.field}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                        contra.severity === 'HIGH'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {contra.severity} Severity
-                    </span>
-                  </div>
-
-                  {/* Side-by-side comparison */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="rounded bg-white p-2.5 border border-neutral-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                        Source A ({contra.sourceA})
-                      </span>
-                      <p className="font-medium text-neutral-800">{contra.valueA}</p>
-                    </div>
-                    <div className="rounded bg-white p-2.5 border border-neutral-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                        Source B ({contra.sourceB})
-                      </span>
-                      <p className="font-medium text-neutral-800">{contra.valueB}</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-neutral-600 leading-relaxed">
-                    <strong className="text-neutral-700">Explanation:</strong> {contra.explanation}
-                  </p>
-
-                  {/* Clarification prompt */}
-                  <div className="pt-2 border-t border-neutral-200/60">
-                    <label
-                      htmlFor={`clarify-${contra.id}`}
-                      className="text-xs font-semibold text-neutral-800 block mb-1"
-                    >
-                      💬 {contra.clarificationNeeded}
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        id={`clarify-${contra.id}`}
-                        type="text"
-                        placeholder="Provide your clarification..."
-                        value={activeClarifications[contra.id] || ''}
-                        onChange={(e) =>
-                          setActiveClarifications((prev) => ({
-                            ...prev,
-                            [contra.id]: e.target.value,
-                          }))
-                        }
-                        className="flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
-                      <Button
-                        size="sm"
-                        variant={isResolved ? 'outline' : 'primary'}
-                        onClick={() => handleSaveClarification(contra.id)}
-                        disabled={!activeClarifications[contra.id]?.trim()}
-                      >
-                        {isResolved ? 'Updated' : 'Submit'}
-                      </Button>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                        {contra.field}
+                      </h4>
                     </div>
                     {isResolved && (
-                      <p className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1">
-                        <span>✓</span> Clarification recorded for case file.
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                        RESOLVED
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {contra.explanation}
+                  </p>
+
+                  {/* Side-by-Side Comparison */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
+                      Comparing Details
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Statement / Source A */}
+                      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+                          Your statement ({contra.sourceA || 'Narrative'})
+                        </span>
+                        <p className="text-sm font-semibold text-white font-mono">
+                          {contra.valueA}
+                        </p>
+                      </div>
+
+                      {/* Document / Source B */}
+                      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                        <span className="text-[10px] font-mono uppercase text-indigo-300 block font-semibold">
+                          Document record ({contra.sourceB || 'Evidence'})
+                        </span>
+                        <p className="text-sm font-semibold text-indigo-100 font-mono">
+                          {contra.valueB}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Which one is correct? Calm clarification picker */}
+                  <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
+                    <label
+                      htmlFor={`clarify-input-${contra.id}`}
+                      className="text-xs font-semibold text-slate-200 block"
+                    >
+                      Which one is correct?
+                    </label>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSelectOption(contra, contra.valueA, `Statement (${contra.sourceA})`)
+                        }
+                        className={clsx(
+                          'px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all text-left flex items-center gap-1.5',
+                          currentResolution?.includes(contra.valueA)
+                            ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]'
+                            : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700'
+                        )}
+                      >
+                        <span>✓</span>
+                        <span>Use {contra.valueA}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSelectOption(contra, contra.valueB, `Document (${contra.sourceB})`)
+                        }
+                        className={clsx(
+                          'px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all text-left flex items-center gap-1.5',
+                          currentResolution?.includes(contra.valueB)
+                            ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]'
+                            : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700'
+                        )}
+                      >
+                        <span>✓</span>
+                        <span>Use {contra.valueB}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCustomInputOpen((prev) => ({
+                            ...prev,
+                            [contra.id]: !prev[contra.id],
+                          }))
+                        }
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors"
+                      >
+                        {customInputOpen[contra.id] ? 'Hide note' : 'Other clarification…'}
+                      </button>
+                    </div>
+
+                    {/* Custom text clarification input */}
+                    {customInputOpen[contra.id] && (
+                      <div className="flex gap-2 pt-1 animate-fade-in">
+                        <input
+                          id={`clarify-input-${contra.id}`}
+                          type="text"
+                          placeholder={contra.clarificationNeeded || 'Describe the accurate details…'}
+                          value={activeClarifications[contra.id] || ''}
+                          onChange={(e) =>
+                            setActiveClarifications((prev) => ({
+                              ...prev,
+                              [contra.id]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 rounded-xl px-3.5 py-2 text-xs bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleCustomSubmit(contra.id)}
+                          disabled={!activeClarifications[contra.id]?.trim()}
+                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    )}
+
+                    {isResolved && (
+                      <p className="text-[11px] text-emerald-400 flex items-center gap-1.5 pt-1">
+                        <span>✓</span>
+                        <span>Saved: {currentResolution}</span>
                       </p>
                     )}
                   </div>
@@ -165,12 +265,8 @@ export function ContradictionsCard({
               );
             })}
           </div>
-        ) : (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800">
-            ✓ Full internal consistency: narrative statements correspond with verified facts and documents.
-          </div>
         )}
       </div>
     </article>
   );
-}
+};

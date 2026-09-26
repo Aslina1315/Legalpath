@@ -2,18 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── CSS Custom Properties (design tokens as CSS vars) ─────────── */
+/* ── Google Fonts ──────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ── CSS Custom Properties (Calm, Intelligent Editorial Legal Aesthetic) ── */
 :root {
-  --color-brand: #4f62f5;
-  --color-brand-dark: #3337cf;
-  --color-text-primary: #171717;
-  --color-text-secondary: #525252;
-  --color-surface: #f8f8f8;
+  /* Warm neutral obsidian base */
+  --color-bg-primary: #0b0d14;
+  --color-bg-secondary: #10131e;
+  --color-bg-elevated: #151826;
+  --color-bg-card: rgba(18, 22, 36, 0.72);
+  --color-bg-card-hover: rgba(26, 31, 50, 0.85);
+  --color-bg-glass: rgba(14, 17, 28, 0.65);
 
-  --font-sans: 'Inter', system-ui, sans-serif;
+  /* Refined, intelligent accent (luminous slate-indigo & sapphire) */
+  --gradient-brand: linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #c7d2fe 100%);
+  --gradient-brand-subtle: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(129, 140, 248, 0.05));
+  --gradient-hero: linear-gradient(165deg, #0b0d14 0%, #121524 45%, #181d33 80%, #0d0f18 100%);
+  --gradient-glow: radial-gradient(ellipse at 50% -10%, rgba(99, 102, 241, 0.14) 0%, transparent 65%);
 
+  /* Deep ink text with warm high contrast */
+  --color-text-primary: #f1f3fa;
+  --color-text-secondary: #9aa3c0;
+  --color-text-muted: #5d668c;
+  --color-text-accent: #a5b4fc;
+
+  /* Borders & soft dividers */
+  --color-border: rgba(129, 140, 248, 0.12);
+  --color-border-subtle: rgba(129, 140, 248, 0.07);
+  --color-border-accent: rgba(129, 140, 248, 0.28);
+
+  /* Carefully controlled depth & shadows */
+  --glow-brand: 0 0 32px rgba(99, 102, 241, 0.16);
+  --glow-card: 0 4px 24px rgba(0, 0, 0, 0.35), 0 0 1px rgba(129, 140, 248, 0.15);
+  --glow-card-hover: 0 8px 36px rgba(0, 0, 0, 0.45), 0 0 2px rgba(129, 140, 248, 0.3);
+
+  /* Trust & Status Accents */
+  --color-trust-green: #34d399;
+  --color-trust-amber: #fbbf24;
+  --color-trust-red: #f87171;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Reduced Motion ────────────────────────────────────────────── */
@@ -28,17 +65,56 @@
   }
 }
 
-/* ── Base Typography ───────────────────────────────────────────── */
+/* ── Base Reset & Typography ──────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
 body {
   font-family: var(--font-sans);
   color: var(--color-text-primary);
+  background: var(--color-bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+/* ── Ambient Background Effect ─────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--gradient-glow);
+  opacity: 0.7;
+}
+
+/* ── Selection ─────────────────────────────────────────────────── */
+::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: #fff;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.25);
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.4);
 }
 
 /* ── Focus Styles ──────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid rgba(139, 92, 246, 0.6);
   outline-offset: 2px;
 }
 
@@ -49,7 +125,7 @@ body {
   left: 0;
   z-index: 9999;
   padding: 0.5rem 1rem;
-  background: var(--color-brand);
+  background: var(--gradient-brand);
   color: white;
   font-weight: 600;
   border-radius: 0 0 0.5rem 0;
@@ -59,3 +135,267 @@ body {
 .skip-link:focus {
   top: 0;
 }
+
+/* ── Glass Card System ─────────────────────────────────────────── */
+.glass-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: var(--glow-card);
+  transition: all var(--transition-normal);
+}
+
+.glass-card:hover {
+  background: var(--color-bg-card-hover);
+  border-color: var(--color-border-accent);
+  box-shadow: var(--glow-card-hover);
+  transform: translateY(-1px);
+}
+
+.glass-card-static {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: var(--glow-card);
+}
+
+/* ── Gradient Text ─────────────────────────────────────────────── */
+.gradient-text {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Shimmer Loader ────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.04) 25%,
+    rgba(99, 102, 241, 0.1) 50%,
+    rgba(99, 102, 241, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ── Floating Glow Orb ─────────────────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* ── Breathing Ring ─────────────────────────────────────────────── */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* ── Pipeline Step Connector ───────────────────────────────────── */
+.pipeline-connector {
+  position: relative;
+}
+
+.pipeline-connector::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: -1rem;
+  width: 2px;
+  height: 1rem;
+  background: linear-gradient(to bottom, transparent, var(--color-border-accent));
+}
+
+/* ── Step Badge ────────────────────────────────────────────────── */
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.1);
+  color: #a78bfa;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.step-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Stat Pill ─────────────────────────────────────────────────── */
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+}
+
+/* ── Input Styling Overrides ───────────────────────────────────── */
+input, textarea, select {
+  color-scheme: dark;
+}
+
+textarea {
+  background: var(--color-bg-elevated) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+}
+
+textarea:focus {
+  border-color: rgba(129, 140, 248, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+}
+
+textarea::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+/* ── Editorial Typography ───────────────────────────────────────── */
+.font-editorial {
+  font-family: var(--font-serif);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+.editorial-headline {
+  font-family: var(--font-serif);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+/* ── Conversational Intake Surface ──────────────────────────────── */
+.conversational-surface {
+  position: relative;
+  background: linear-gradient(180deg, rgba(20, 24, 40, 0.85) 0%, rgba(14, 17, 30, 0.95) 100%);
+  border: 1px solid rgba(129, 140, 248, 0.18);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  transition: all var(--transition-normal);
+}
+
+.conversational-surface:focus-within {
+  border-color: rgba(129, 140, 248, 0.4);
+  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.55), 0 0 30px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(129, 140, 248, 0.2) inset;
+}
+
+/* ── Trust Strip ────────────────────────────────────────────────── */
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 9999px;
+  background: rgba(16, 20, 34, 0.55);
+  border: 1px solid rgba(129, 140, 248, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.trust-item:hover {
+  color: var(--color-text-primary);
+}
+
+/* ── Interactive Living AI Journey ─────────────────────────────── */
+.journey-container {
+  position: relative;
+  background: rgba(14, 18, 30, 0.6);
+  border: 1px solid rgba(129, 140, 248, 0.12);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(16px);
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.journey-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-normal);
+}
+
+.journey-node-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(22, 27, 46, 0.8);
+  border: 1px solid rgba(129, 140, 248, 0.15);
+  color: var(--color-text-muted);
+  transition: all var(--transition-normal);
+}
+
+.journey-node.active .journey-node-icon {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(129, 140, 248, 0.6);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.35);
+  transform: translateY(-2px);
+}
+
+.journey-node.completed .journey-node-icon {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: var(--color-trust-green);
+}
+
+/* ── Card progressive reveal animation ─────────────────────────── */
+.card-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: cardReveal 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes cardReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

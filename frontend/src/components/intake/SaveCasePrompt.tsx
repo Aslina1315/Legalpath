@@ -1,10 +1,9 @@
 /**
  * SaveCasePrompt — shown after AI intake completes.
+ * Premium dark variant.
  *
  * If the user is signed in: automatically saves the case to Firestore.
  * If not signed in: shows a gentle nudge to sign in to save their work.
- *
- * This is a controlled component — parent decides when to render it.
  */
 
 'use client';
@@ -56,15 +55,20 @@ export function SaveCasePrompt({ draft, onSaved }: SaveCasePromptProps) {
     }
   }
 
-  // After auth completes, auto-save kicks in via useEffect above
   const handleAuthSuccess = () => {
     setShowAuth(false);
-    // useEffect will pick up the new user from the store
   };
 
   if (saved || caseId) {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-2.5 text-sm text-trust-green">
+      <div
+        className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
+        style={{
+          background: 'rgba(52, 211, 153, 0.06)',
+          border: '1px solid rgba(52, 211, 153, 0.15)',
+          color: '#34d399',
+        }}
+      >
         <span aria-hidden="true">✓</span>
         <span>Case saved to your account</span>
       </div>
@@ -73,8 +77,15 @@ export function SaveCasePrompt({ draft, onSaved }: SaveCasePromptProps) {
 
   if (saving) {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-brand-50 px-4 py-2.5 text-sm text-brand-600">
-        <span className="h-2 w-2 animate-pulse-soft rounded-full bg-brand-500" aria-hidden="true" />
+      <div
+        className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
+        style={{
+          background: 'rgba(99, 102, 241, 0.06)',
+          border: '1px solid rgba(99, 102, 241, 0.15)',
+          color: '#a78bfa',
+        }}
+      >
+        <span className="h-2 w-2 animate-pulse-soft rounded-full bg-current" aria-hidden="true" />
         <span>Saving your case…</span>
       </div>
     );
@@ -82,7 +93,14 @@ export function SaveCasePrompt({ draft, onSaved }: SaveCasePromptProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+      <div
+        className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+        style={{
+          background: 'rgba(248, 113, 113, 0.06)',
+          border: '1px solid rgba(248, 113, 113, 0.15)',
+          color: '#f87171',
+        }}
+      >
         <span>{error}</span>
         {user && (
           <Button
@@ -100,10 +118,12 @@ export function SaveCasePrompt({ draft, onSaved }: SaveCasePromptProps) {
   // Not signed in
   return (
     <>
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3">
+      <div
+        className="flex items-center justify-between gap-4 rounded-xl px-5 py-4 glass-card-static"
+      >
         <div>
-          <p className="text-sm font-medium text-brand-700">Save your case</p>
-          <p className="text-xs text-brand-500 mt-0.5">
+          <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Save your case</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
             Sign in to save your progress and continue later.
           </p>
         </div>

@@ -1,5 +1,5 @@
 /**
- * Accessible growing Textarea.
+ * Accessible growing Textarea — Premium dark variant.
  * Auto-resizes as content grows. Includes label, hint, error states.
  */
 
@@ -32,7 +32,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     ref
   ) => {
     const internalRef = useRef<HTMLTextAreaElement>(null);
-    const resolvedRef = (ref as React.RefObject<HTMLTextAreaElement> | null) ?? internalRef;
+    const resolvedRef = (ref as React.RefObject<HTMLTextAreaElement>) ?? internalRef;
 
     const inputId = id ?? `textarea-${label.replace(/\s+/g, '-').toLowerCase()}`;
     const hintId = hint ? `${inputId}-hint` : undefined;
@@ -48,19 +48,20 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     });
 
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <label
           htmlFor={inputId}
           className={clsx(
-            'text-sm font-medium text-neutral-700',
+            'text-sm font-semibold',
             hideLabel && 'sr-only'
           )}
+          style={{ color: 'var(--color-text-primary)' }}
         >
           {label}
         </label>
 
         {hint && (
-          <p id={hintId} className="text-sm text-neutral-500">
+          <p id={hintId} className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
             {hint}
           </p>
         )}
@@ -70,18 +71,21 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={inputId}
           aria-describedby={describedBy}
           aria-invalid={error ? 'true' : 'false'}
-          rows={4}
+          rows={5}
           className={clsx(
-            'w-full rounded-lg border px-4 py-3',
-            'text-neutral-900 placeholder:text-neutral-400',
+            'w-full rounded-xl px-4 py-4',
             'resize-none overflow-hidden',
             'text-base leading-relaxed',
-            'transition-colors duration-150 motion-reduce:transition-none',
-            'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
-            !error && 'border-neutral-300 hover:border-neutral-400',
-            error && 'border-trust-red focus:ring-trust-red',
+            'transition-all duration-200 motion-reduce:transition-none',
+            'focus:outline-none',
+            error && 'ring-2 ring-trust-red',
             className
           )}
+          style={{
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-primary)',
+          }}
           onChange={onChange}
           {...props}
         />
@@ -95,10 +99,15 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           {charCount !== undefined && maxChars !== undefined && (
             <p
               className={clsx(
-                'ml-auto text-xs',
-                charCount > maxChars * 0.9 ? 'text-trust-amber' : 'text-neutral-400',
+                'ml-auto text-xs font-mono',
+                charCount > maxChars * 0.9
+                  ? 'text-trust-amber'
+                  : '',
                 charCount > maxChars && 'text-trust-red'
               )}
+              style={{
+                color: charCount > maxChars * 0.9 ? undefined : 'var(--color-text-muted)',
+              }}
               aria-live="polite"
             >
               {charCount.toLocaleString()} / {maxChars.toLocaleString()}

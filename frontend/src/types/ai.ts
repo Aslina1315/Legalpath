@@ -124,7 +124,7 @@ export interface SystemReadinessResponse {
 export interface DomainRoutingResult {
   domain: string;
   subDomain: string;
-  jurisdiction: string;
+  jurisdiction: string | null;
   jurisdictionConfidence: number; // 0.0 to 1.0
   reasoningSummary: string;
   missingInformation: string[];
@@ -136,7 +136,7 @@ export interface KnowledgeSource {
   title: string;
   url: string;
   sourceType: 'statute' | 'guidance' | 'case_law' | 'official_portal' | 'other';
-  publisher?: string;
+  publisher?: string | null;
   retrievedAt: string;
   relevance: string;
   summary: string;
@@ -244,7 +244,7 @@ export interface ActionStep {
   whyItMatters: string;
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-  estimatedTimeframe?: string;
+  estimatedTimeframe?: string | null;
 }
 
 export interface DocumentNeeded {
@@ -266,5 +266,104 @@ export interface ActionPathResult {
   questionsToResolve: string[];
   possibleEscalation: EscalationOption[];
   humanHelpRecommended: boolean;
-  humanHelpReasoning?: string;
+  humanHelpReasoning?: string | null;
 }
+
+// ─── Module 11: Formal Document Generator ───────────────────────────────────
+export type DocumentType =
+  | 'formal_complaint'
+  | 'pre_action_representation'
+  | 'demand_letter'
+  | 'information_request';
+
+export type DocumentSectionCategory =
+  | 'USER_PROVIDED_FACT'
+  | 'VERIFIED_SOURCE_INFO'
+  | 'AI_GENERATED_WORDING'
+  | 'UNCERTAIN_OR_MISSING';
+
+export interface DocumentDraftSection {
+  id: string;
+  heading: string;
+  category: DocumentSectionCategory;
+  content: string;
+  sourceRef?: string | null;
+  isCustomizable: boolean;
+}
+
+export interface DocumentDraftResult {
+  documentId: string;
+  title: string;
+  documentType: DocumentType;
+  recipientRoleOrTitle: string;
+  jurisdiction: string;
+  sections: DocumentDraftSection[];
+  userProvidedFactsSummary: string[];
+  verifiedSourceInformation: Array<{
+    citation: string;
+    principle: string;
+    sourceUrl?: string | null;
+  }>;
+  aiGeneratedWordingNotice: string;
+  uncertainOrMissingInformation: string[];
+  formalNoticeDisclaimer: string;
+  generatedAt: string;
+}
+
+// ─── Module 12: Before-You-Send Review ──────────────────────────────────────
+export type ReviewVerdict = 'READY' | 'NEEDS_REVIEW' | 'BLOCKED';
+
+export type ReviewCheckSeverity = 'PASS' | 'WARNING' | 'CRITICAL';
+
+export type ReviewCheckCategory =
+  | 'FACTUAL_CONSISTENCY'
+  | 'CONTRADICTIONS'
+  | 'UNSUPPORTED_CLAIMS'
+  | 'MISSING_INFORMATION'
+  | 'MISSING_ATTACHMENTS'
+  | 'JURISDICTION_CONSISTENCY'
+  | 'SOURCE_CONSISTENCY'
+  | 'WORDING_CONFIDENCE';
+
+export interface ReviewCheckItem {
+  id: string;
+  category: ReviewCheckCategory;
+  label: string;
+  passed: boolean;
+  severity: ReviewCheckSeverity;
+  details: string;
+  remediation?: string | null;
+}
+
+export interface BeforeSendReviewResult {
+  verdict: ReviewVerdict;
+  summary: string;
+  checklist: ReviewCheckItem[];
+  blockers: string[];
+  warnings: string[];
+  confirmationsNeeded: string[];
+  reviewedAt: string;
+}
+
+// ─── Module 13: Human Help Bridge ───────────────────────────────────────────
+export interface HumanHelpResource {
+  id: string;
+  name: string;
+  serviceType: 'official_legal_aid' | 'government_service' | 'ombudsman' | 'court_service' | 'community_clinic';
+  description: string;
+  websiteUrl: string;
+  telephone?: string;
+  eligibilityNote?: string;
+  coverageArea: string;
+  isVerifiedOfficial: boolean;
+}
+
+export interface HumanHelpBridgeResult {
+  jurisdiction: string;
+  headline: string;
+  recommendedReason: string;
+  officialResources: HumanHelpResource[];
+  locationNotice: string;
+  nonAdvocateDisclaimer: string;
+}
+

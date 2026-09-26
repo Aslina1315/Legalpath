@@ -11,6 +11,54 @@ import type { AIStructuredResponse } from '@/types/ai';
 import type { ZodSchema } from 'zod';
 
 /**
+ * Checks whether an error is a Gemini 429 / RESOURCE_EXHAUSTED / quota limit error.
+ */
+export function is429Error(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes('429') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('quota') ||
+    msg.includes('Quota') ||
+    msg.includes('rate limit') ||
+    msg.includes('GenerateRequestsPerMinute')
+  );
+}
+
+/**
+ * Extracts retry delay in milliseconds from an error message if present,
+ * defaulting to 2500ms and capping at 5000ms.
+ */
+export function extractRetryDelayMs(error: unknown): number {
+  if (!error) return 2500;
+  const msg = error instanceof Error ? error.message : String(error);
+  const match = msg.match(/retry (?:after|in) ([\d.]+)\s*s/i);
+  if (match && match[1]) {
+    const sec = parseFloat(match[1]);
+    if (!isNaN(sec) && sec > 0) return Math.min(Math.round(sec * 1000), 5000);
+  }
+  return 2500;
+}
+
+/**
+ * Executes a Gemini operation with minimal 429 handling.
+ * Do not retry a rate-limited request in a loop; surface a single user-facing message instead.
+ */
+export async function executeWithGemini429Handling<T>(
+  operation: () => Promise<T>
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (is429Error(error)) {
+      throw new Error('AI is temporarily busy. Please retry in a moment.');
+    }
+    throw error;
+  }
+}
+
+/**
  * Generates a structured JSON response from Gemini.
  * Validates the response against the provided Zod schema.
  *
@@ -34,7 +82,7 @@ export async function generateStructured<T>(
     safetySettings: STRUCTURED_MODEL.safetySettings,
   });
 
-  const result = await model.generateContent(prompt);
+  const result = await executeWithGemini429Handling(() => model.generateContent(prompt));
   const responseText = result.response.text();
 
   let parsedData: unknown;
@@ -54,3 +102,4 @@ export async function generateStructured<T>(
     candidateTokens: result.response.usageMetadata?.candidatesTokenCount,
   };
 }
+

@@ -25,7 +25,7 @@ export interface ActionPathOptions {
   evidenceGaps?: EvidenceGapResult | null;
   contradictions?: ContradictionResult | null;
   domain?: string;
-  jurisdiction?: string;
+  jurisdiction?: string | null;
   caseStructure?: CaseStructureResult;
   domainRouting?: DomainRoutingResult;
   verification?: ResponseVerificationResult;
@@ -70,7 +70,7 @@ export async function runActionPath(
     const verification = verificationArg!;
     domain = domainRouting.domain;
     subDomain = domainRouting.subDomain;
-    jurisdiction = domainRouting.jurisdiction;
+    jurisdiction = domainRouting.jurisdiction || 'Detected Jurisdiction';
     facts = caseStructure.structuredFacts.map((f: { text: string }) => f.text);
     timeline = caseStructure.timeline;
     verifiedSummary = verification.verifiedSummary;

@@ -129,13 +129,13 @@ export function CaseResultCard({ result, generatedAt, model }: CaseResultCardPro
         </div>
 
         {/* Jurisdiction */}
-        {result.detectedJurisdiction && (
-          <div className="px-5 py-4">
-            <Section title="Jurisdiction detected">
-              <p className="text-sm text-neutral-700">{result.detectedJurisdiction}</p>
-            </Section>
-          </div>
-        )}
+        <div className="px-5 py-4">
+          <Section title="Jurisdiction detected">
+            <p className="text-sm text-neutral-700">
+              {result.detectedJurisdiction || 'Needs clarification'}
+            </p>
+          </Section>
+        </div>
 
         {/* Key facts */}
         {result.keyFacts.length > 0 && (

@@ -1,9 +1,26 @@
+/**
+ * ContinuousCaseWorkspace — The unified, continuous legal case experience.
+ *
+ * Core Principles:
+ *   ONE CONTINUOUS EXPERIENCE.
+ *   Progressive revealing of 7 real-time intelligence sections:
+ *     1. WHAT WE UNDERSTOOD (Summary, entities, key facts, timeline)
+ *     2. WHERE THIS MAY FIT (Domain, jurisdiction, confidence, missing information)
+ *     3. WHAT THE CURRENT SOURCES SAY (Source title, publisher, citation, retrieval status, concise explanation)
+ *     4. YOUR EVIDENCE (Upload area, analyzed documents, extracted facts)
+ *     5. WHAT NEEDS ATTENTION (Evidence gaps, contradictions, clarification requests)
+ *     6. VERIFIED INFORMATION (Supported, partially supported, uncertain — trust layer)
+ *     7. YOUR NEXT STEPS (Roadmap, documents needed, document preparation, human help bridge)
+ */
+
 'use client';
 
 import React, { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import { AIGuideCharacter } from '@/components/ui/AIGuideCharacter';
+import { LivePipelineProgress } from './LivePipelineProgress';
+import { InteractiveJourney } from './InteractiveJourney';
 import { DomainCard } from './DomainCard';
 import { KnowledgeSourcesCard } from './KnowledgeSourcesCard';
 import { EvidenceUploaderCard } from './EvidenceUploaderCard';
@@ -13,16 +30,16 @@ import { VerifiedGuidanceCard } from './VerifiedGuidanceCard';
 import { ActionPathCard } from './ActionPathCard';
 import { SaveCasePrompt } from './SaveCasePrompt';
 import { CaseStructureCard } from './CaseStructureCard';
+import { DocumentGeneratorCard } from './DocumentGeneratorCard';
+import { HumanHelpBridgeCard } from './HumanHelpBridgeCard';
+import { getTranslation } from '@/lib/i18n';
+import { deleteCase } from '@/lib/firebase/firestore';
 
 import { runEvidenceAnalysis, type UploadedEvidenceFile } from '@/lib/ai/evidenceAnalyzerModule';
-import { runEvidenceGapDetection } from '@/lib/ai/evidenceGapModule';
-import { runContradictionDetection } from '@/lib/ai/contradictionModule';
-import { runResponseVerification } from '@/lib/ai/responseVerifierModule';
-import { runActionPathPlan } from '@/lib/ai/actionPathModule';
+import { runTrustAndAction } from '@/lib/ai/trustAndActionModule';
 
-import type {
-  CaseStructureResult,
-} from '@/lib/ai/schemas';
+import type { CaseStructureResult, CaseUnderstandingResult } from '@/lib/ai/schemas';
+import type { KnowledgeRetrievalResult } from '@/types/ai';
 
 interface ContinuousCaseWorkspaceProps {
   initialStructure?: CaseStructureResult;
@@ -33,7 +50,8 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
   initialStructure,
   onReset,
 }) => {
-  const { aiState, setAIState, aiError, setAIError } = useAppStore();
+  const { aiState, setAIState, aiError, setAIError, language } = useAppStore();
+  const t = getTranslation(language);
   const {
     currentDraft,
     updateDraft,
@@ -41,13 +59,16 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
     addUploadedFile,
     userClarifications,
     setUserClarification,
+    caseId,
+    setCaseId,
+    clearDraft,
   } = useCaseStore();
 
   const [activeStepMessage, setActiveStepMessage] = useState<string>(
-    'Case analyzed. Synthesizing cross-module insights…'
+    'Understanding situation & organizing legal intelligence…'
   );
 
-  // Re-run downstream synthesis (Gaps, Contradictions, Verification, Action Path)
+  // Re-run downstream synthesis with new evidence (calls at most 2 Gemini operations)
   const runDownstreamPipeline = useCallback(
     async (
       structureData: CaseStructureResult,
@@ -57,7 +78,14 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
       try {
         const narrative = currentDraft?.narrative || '';
         const domainData = currentDraft?.domainRouting;
-        const retrievalData = currentDraft?.knowledgeRetrieval;
+        const retrievalData: KnowledgeRetrievalResult = currentDraft?.knowledgeRetrieval || {
+          status: 'no_verified_source',
+          queryUsed: '',
+          keyFindings: [],
+          sources: [],
+          applicableRules: [],
+          limitations: [],
+        };
 
         // 1. Evidence Analysis for any uploaded files that haven't been analyzed
         const analyzedEvidenceResults = [];
@@ -67,68 +95,114 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
           } else {
             setAIState('ANALYZING');
             setActiveStepMessage(`Analyzing document: ${file.name}…`);
-            const analysisRes = await runEvidenceAnalysis(file);
+            const analysisRes = await runEvidenceAnalysis(file, narrative);
             file.analysisResult = analysisRes.data;
             analyzedEvidenceResults.push(analysisRes.data);
           }
         }
 
-        // 2. Module 07: Evidence Gaps
-        setAIState('COMPARING');
-        setActiveStepMessage('Auditing case for evidence gaps and missing documentation…');
-        const gapsRes = await runEvidenceGapDetection({
-          narrative,
-          structure: structureData,
-          evidence: analyzedEvidenceResults,
-          retrievedKnowledge: retrievalData,
-        });
+        // 2. Trust & Action Synthesis (single consolidated call)
+        setAIState('VERIFYING');
+        setActiveStepMessage('Updating evidence gaps, contradictions, verification, and action path…');
 
-        // 3. Module 08: Contradictions
-        setActiveStepMessage('Detecting discrepancies between statements and documents…');
-        const contradictionsRes = await runContradictionDetection({
-          narrative,
-          structure: structureData,
+        const caseUnderstandingData: CaseUnderstandingResult = {
+          summary: narrative.slice(0, 200),
+          structuredFacts: structureData.structuredFacts,
+          entities: structureData.entities,
+          timeline: structureData.timeline,
+          domain: domainData?.domain || 'General Legal Matter',
+          subDomain: domainData?.subDomain || undefined,
+          domainConfidence: domainData?.jurisdictionConfidence || 0.9,
+          jurisdiction: domainData?.jurisdiction ?? null,
+          jurisdictionConfidence: domainData?.jurisdictionConfidence || 0.8,
+          missingInformation: domainData?.missingInformation || [],
+          urgencySignals: domainData?.urgencySignals || [],
+          urgencyLevel: 'MEDIUM',
+          initialEvidenceGaps: structureData.evidenceMissing,
+        };
+
+        const trustRes = await runTrustAndAction({
+          caseUnderstanding: caseUnderstandingData,
+          retrievedKnowledge: retrievalData,
           evidence: analyzedEvidenceResults,
           userClarifications: clarifications,
         });
+        const trustData = trustRes.data;
 
-        // 4. Module 09: Response Verification
-        setAIState('VERIFYING');
-        setActiveStepMessage('Verifying factual and legal claims against retrieved sources…');
-        const draftGuidance = `Assessment for ${domainData?.domain || 'legal matter'} in ${
-          domainData?.jurisdiction || 'detected jurisdiction'
-        }: Based on facts and retrieved authorities, procedural requirements apply.`;
-
-        const verificationRes = await runResponseVerification({
-          draftResponse: draftGuidance,
-          retrievedKnowledge: retrievalData,
-          structuredFacts: structureData.structuredFacts,
-          jurisdiction: domainData?.jurisdiction,
-        });
-
-        // 5. Module 10: Action Path
-        setAIState('PLANNING');
-        setActiveStepMessage('Constructing prioritized actionable roadmap…');
-        const actionPathRes = await runActionPathPlan({
-          currentSituation: verificationRes.data.verifiedSummary,
-          verifiedClaims: verificationRes.data.claims,
-          evidenceGaps: gapsRes.data,
-          contradictions: contradictionsRes.data,
-          domain: domainData?.domain,
-          jurisdiction: domainData?.jurisdiction,
-        });
-
-        // Update state in draft
+        // Update state in draft in place (user does not restart case!)
         updateDraft({
-          evidenceGaps: gapsRes.data,
-          contradictions: contradictionsRes.data,
-          responseVerification: verificationRes.data,
-          actionPath: actionPathRes.data,
+          evidenceGaps: {
+            gaps: trustData.evidenceGaps.map((g) => ({
+              id: g.id,
+              gapType: 'MISSING_DOCUMENT' as const,
+              description: g.missingEvidence || g.claim,
+              importance: (g.importance === 'CRITICAL' ? 'HIGH' : g.importance === 'IMPORTANT' ? 'MEDIUM' : 'LOW') as 'HIGH' | 'MEDIUM' | 'LOW',
+              whyItMatters: g.suggestion,
+              suggestedClarification: g.suggestion,
+            })),
+            overallCompleteness: trustData.overallCompletenessScore,
+            summary: 'Evidence analysis complete.',
+          },
+          contradictions: {
+            contradictions: trustData.contradictions.map((c) => ({
+              id: c.id,
+              field: 'Statement vs Evidence',
+              sourceA: c.sourceA,
+              valueA: c.statementA,
+              sourceB: c.sourceB,
+              valueB: c.statementB,
+              severity: c.severity,
+              explanation: c.resolutionPrompt,
+              clarificationNeeded: c.resolutionPrompt,
+            })),
+            hasContradictions: trustData.contradictions.length > 0,
+            summary:
+              trustData.contradictions.length > 0
+                ? 'Identified potential contradictions between statements and evidence.'
+                : 'No contradictions identified between statements and evidence.',
+          },
+          responseVerification: {
+            verifiedSummary: trustData.verifiedSummary,
+            claims: trustData.claims.map((cl) => ({
+              claim: cl.claimText,
+              status: cl.status,
+              supportingSources: cl.sourceRef ? [cl.sourceRef] : [],
+              caseFactAlignment: true,
+              jurisdictionConsistency: true,
+              reasoning: cl.explanation,
+            })),
+            overallTrustScore: trustData.overallTrustScore,
+            unsupportedClaimsFlagged: trustData.claims
+              .filter((c) => c.status === 'UNSUPPORTED')
+              .map((c) => c.claimText),
+            disclaimer: 'AI-assisted analysis based on available facts and sources.',
+          },
+          actionPath: {
+            currentSituation: trustData.verifiedSummary,
+            nextSteps: trustData.actionSteps.map((step, idx) => ({
+              id: step.id || `step-${idx + 1}`,
+              title: step.title,
+              description: step.whyItMatters,
+              whyItMatters: step.whyItMatters,
+              priority: (step.priority === 'IMMEDIATE' ? 'URGENT' : step.priority) as 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW',
+              status: 'PENDING' as const,
+              estimatedTimeframe: step.timeframe,
+            })),
+            documentsNeeded: trustData.actionSteps.flatMap((s) => s.documentsNeeded).map((name) => ({
+              documentName: name,
+              purpose: 'Verification',
+              priority: 'HIGH' as const,
+            })),
+            questionsToResolve: [],
+            possibleEscalation: [],
+            humanHelpRecommended: trustData.humanHelpRecommendation.needed,
+            humanHelpReasoning: trustData.humanHelpRecommendation.reason,
+          },
           status: 'ACTIONABLE',
         });
 
         setAIState('READY');
-        setActiveStepMessage('Analysis complete. All insights verified.');
+        setActiveStepMessage('Analysis complete. All insights updated with new evidence.');
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Downstream pipeline processing error';
         setAIError(msg);
@@ -160,40 +234,121 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
     [setUserClarification, userClarifications, initialStructure, uploadedFiles, runDownstreamPipeline]
   );
 
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const isWorking =
     aiState !== 'IDLE' && aiState !== 'READY' && aiState !== 'ERROR';
 
+  // Feature 17: Follow-up Intelligence State
+  let followUpMessage: string | null = null;
+  let followUpAction: { label: string; onClick: () => void } | null = null;
+
+  const unresolvedContradiction = currentDraft?.contradictions?.contradictions?.find(
+    (c) => !userClarifications[c.id]
+  );
+  const pendingActionSteps = currentDraft?.actionPath?.nextSteps?.filter(
+    (s) => s.status !== 'COMPLETED'
+  );
+  const allActionStepsCompleted =
+    currentDraft?.actionPath?.nextSteps &&
+    currentDraft.actionPath.nextSteps.length > 0 &&
+    currentDraft.actionPath.nextSteps.every((s) => s.status === 'COMPLETED');
+
+  if (unresolvedContradiction) {
+    followUpMessage = t.followUp.clarificationNeeded;
+    followUpAction = {
+      label: 'Review Clarification',
+      onClick: () => scrollToSection('sec-attention'),
+    };
+  } else if (currentDraft?.generatedDocument && !currentDraft?.beforeSendReview) {
+    followUpMessage = t.followUp.draftReady;
+    followUpAction = {
+      label: 'Review Draft',
+      onClick: () => scrollToSection('sec-action'),
+    };
+  } else if (pendingActionSteps && pendingActionSteps.length > 0) {
+    followUpMessage = t.followUp.actionStepOpen;
+    followUpAction = {
+      label: 'View Next Step',
+      onClick: () => scrollToSection('sec-action'),
+    };
+  } else if (allActionStepsCompleted) {
+    followUpMessage = t.followUp.pathComplete;
+  }
+
   return (
-    <div className="space-y-8 animate-fade-in" aria-label="Case Workspace">
-      {/* Top AI Guide Bar */}
+    <div className="space-y-8 animate-fade-in w-full max-w-4xl mx-auto pb-16" aria-label="Case Workspace">
+      {/* ═══ Top AI Command Center ═══ */}
       <section
-        className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 shadow-xl"
+        className="glass-card-static p-6 sm:p-8 overflow-hidden relative"
         aria-live="polite"
       >
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px]"
+          style={{ background: 'var(--gradient-brand)' }}
+          aria-hidden="true"
+        />
+
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <div className="shrink-0">
             <AIGuideCharacter state={aiState} size="lg" />
           </div>
           <div className="flex-1 text-center sm:text-left space-y-2">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <span className="text-xs uppercase font-mono tracking-wider text-slate-400">
-                Continuous AI Guide
+              <span className="text-[10px] uppercase font-mono tracking-widest font-semibold text-indigo-400">
+                AI Legal Intelligence
               </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-slate-800 text-cyan-300 border border-slate-700">
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold"
+                style={{
+                  background: isWorking
+                    ? 'rgba(99, 102, 241, 0.15)'
+                    : aiState === 'ERROR'
+                    ? 'rgba(248, 113, 113, 0.15)'
+                    : 'rgba(52, 211, 153, 0.12)',
+                  color: isWorking
+                    ? '#a78bfa'
+                    : aiState === 'ERROR'
+                    ? '#f87171'
+                    : '#34d399',
+                  border: `1px solid ${
+                    isWorking
+                      ? 'rgba(99, 102, 241, 0.25)'
+                      : aiState === 'ERROR'
+                      ? 'rgba(248, 113, 113, 0.25)'
+                      : 'rgba(52, 211, 153, 0.2)'
+                  }`,
+                }}
+              >
+                {isWorking && (
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-current"></span>
+                  </span>
+                )}
                 {aiState}
               </span>
             </div>
-            <h2 className="text-xl font-bold text-white tracking-tight">
-              {isWorking ? 'Processing Your Case Journey' : 'Case Workspace Active'}
+
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              {isWorking ? 'Analyzing Your Situation' : 'Case Intelligence Ready'}
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {isWorking ? activeStepMessage : 'Continuous legal intelligence assembled. Review insights and next steps below.'}
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
+              {isWorking
+                ? activeStepMessage
+                : 'All modules complete. Review verified insights, authoritative legal rules, and your step-by-step roadmap below.'}
             </p>
           </div>
+
           {onReset && (
             <button
               onClick={onReset}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl border border-slate-700 transition-colors"
+              className="px-4 py-2.5 text-xs font-semibold rounded-xl text-slate-300 bg-slate-900/80 hover:bg-slate-800 hover:text-white border border-indigo-900/40 transition-colors shrink-0"
             >
               Start New Case
             </button>
@@ -201,135 +356,278 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
         </div>
       </section>
 
-      {/* Error state if occurred */}
+      {/* ═══ Feature 17: Follow-up Intelligence Banner ═══ */}
+      {followUpMessage && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 transition-all"
+          style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08))',
+            border: '1px solid rgba(129, 140, 248, 0.3)',
+            boxShadow: '0 4px 20px rgba(99, 102, 241, 0.1)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-3 w-3 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+            </span>
+            <div>
+              <p className="text-xs font-mono font-semibold uppercase tracking-wider text-indigo-300">
+                In-App Case Follow-Up
+              </p>
+              <p className="text-sm font-medium text-white mt-0.5">
+                {followUpMessage}
+              </p>
+            </div>
+          </div>
+          {followUpAction && (
+            <button
+              type="button"
+              onClick={followUpAction.onClick}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shrink-0 shadow-sm"
+            >
+              {followUpAction.label}
+            </button>
+          )}
+        </aside>
+      )}
+
+      {/* ═══ Live Pipeline Visualization ═══ */}
+      <LivePipelineProgress state={aiState} />
+
+      {/* ═══ Interactive Living Journey ═══ */}
+      <InteractiveJourney
+        aiState={aiState}
+        hasNarrative={Boolean(currentDraft?.narrative)}
+        hasEvidence={uploadedFiles.length > 0}
+        hasVerification={Boolean(currentDraft?.responseVerification)}
+        hasActionPath={Boolean(currentDraft?.actionPath)}
+        onStageSelect={(stageId) => {
+          const map: Record<string, string> = {
+            story: 'sec-understood',
+            understand: 'sec-understood',
+            research: 'sec-sources',
+            evidence: 'sec-evidence',
+            verify: 'sec-verified',
+            action: 'sec-action',
+          };
+          if (map[stageId]) scrollToSection(map[stageId]);
+        }}
+      />
+
+      {/* Processing Note / Error Banner if occurred */}
       {aiError && (
-        <div className="p-5 rounded-2xl bg-rose-950/40 border border-rose-800/60 text-rose-200 text-sm flex items-start gap-3">
-          <span className="text-rose-400 text-lg">⚠️</span>
+        <div
+          role="alert"
+          className="p-4 rounded-xl text-xs flex items-start gap-3 bg-red-950/30 border border-red-800/40 text-red-300 animate-fade-in"
+        >
+          <span className="text-base">⚠️</span>
           <div className="flex-1">
-            <strong className="block text-rose-300 font-semibold mb-1">Processing Note</strong>
-            <p className="text-xs text-rose-200/90 leading-relaxed">{aiError}</p>
+            <strong className="block font-semibold mb-0.5 text-red-200">Processing Note</strong>
+            <p className="leading-relaxed">{aiError}</p>
           </div>
         </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 1. What We Understood & Structured Case (Modules 01 & 02)                */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-          Step 1 · Situation Understanding & Structure
-        </div>
-
-        {currentDraft?.narrative && (
-          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 text-sm">
-            <h3 className="text-xs uppercase font-mono font-semibold text-slate-400 mb-2">Original Narrative</h3>
-            <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{currentDraft.narrative}</p>
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 1. WHAT WE UNDERSTOOD (Summary, Entities, Key Facts, Timeline)      */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {(currentDraft?.narrative || initialStructure) && (
+        <section id="sec-understood" className="space-y-4 card-reveal" aria-labelledby="heading-sec-1">
+          <div className="flex items-center gap-2">
+            <div className="step-badge">
+              <span className="dot" style={{ background: '#818cf8' }}></span>
+              Section 1 · What We Understood
+            </div>
           </div>
-        )}
 
-        {initialStructure && (
-          <CaseStructureCard structure={initialStructure} generatedAt={new Date().toISOString()} />
-        )}
-      </div>
+          {currentDraft?.narrative && (
+            <div className="glass-card-static p-5 space-y-2">
+              <span className="text-[10px] uppercase font-mono font-semibold tracking-widest text-indigo-400 block">
+                Original Statement
+              </span>
+              <p className="text-xs sm:text-sm leading-relaxed text-slate-300 whitespace-pre-wrap">
+                {currentDraft.narrative}
+              </p>
+            </div>
+          )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 2. Legal Domain & Jurisdiction (Module 03)                                */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
+          {initialStructure && (
+            <CaseStructureCard
+              structure={initialStructure}
+              generatedAt={currentDraft?.timestamps?.intakeCompletedAt || new Date().toISOString()}
+            />
+          )}
+        </section>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 2. WHERE THIS MAY FIT (Domain, Jurisdiction, Confidence, Gaps)     */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
       {currentDraft?.domainRouting && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-            Step 2 · Legal Domain & Jurisdiction
+        <section id="sec-domain" className="space-y-4 card-reveal" aria-labelledby="heading-sec-2">
+          <div className="step-badge">
+            <span className="dot" style={{ background: '#6366f1' }}></span>
+            Section 2 · Where This May Fit
           </div>
           <DomainCard domain={currentDraft.domainRouting} />
-        </div>
+        </section>
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 3. Live Grounded Legal Knowledge (Module 05)                              */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 3. WHAT THE CURRENT SOURCES SAY (Source title, publisher, rules)     */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
       {currentDraft?.knowledgeRetrieval && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-            Step 3 · Live Grounded Authorities (Google Search)
+        <section id="sec-sources" className="space-y-4 card-reveal" aria-labelledby="heading-sec-3">
+          <div className="step-badge">
+            <span className="dot" style={{ background: '#22d3ee' }}></span>
+            Section 3 · What The Current Sources Say
           </div>
           <KnowledgeSourcesCard retrieval={currentDraft.knowledgeRetrieval} />
-        </div>
+        </section>
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 4. Evidence Uploader & Analysis (Module 06)                              */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-          Step 4 · Evidence Analysis (PDF, Images)
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 4. YOUR EVIDENCE (Upload Area, Analyzed Documents, Extracted Facts) */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      <section id="sec-evidence" className="space-y-4 card-reveal" aria-labelledby="heading-sec-4">
+        <div className="step-badge">
+          <span className="dot" style={{ background: '#fbbf24' }}></span>
+          Section 4 · Your Evidence
         </div>
-        <EvidenceUploaderCard onEvidenceAnalyzed={handleEvidenceUploaded} />
-      </div>
+        <EvidenceUploaderCard
+          onEvidenceAnalyzed={handleEvidenceUploaded}
+          caseNarrative={currentDraft?.narrative}
+          isProcessing={isWorking}
+        />
+      </section>
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 5. Evidence Gaps (Module 07)                                             */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {currentDraft?.evidenceGaps && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-            Step 5 · Evidence Gap Audit
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 5. WHAT NEEDS ATTENTION (Evidence Gaps, Contradictions)             */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {(currentDraft?.evidenceGaps || currentDraft?.contradictions) && (
+        <section id="sec-attention" className="space-y-4 card-reveal" aria-labelledby="heading-sec-5">
+          <div className="step-badge">
+            <span className="dot" style={{ background: '#f87171' }}></span>
+            Section 5 · What Needs Attention
           </div>
-          <EvidenceGapsCard gapResult={currentDraft.evidenceGaps} />
-        </div>
+
+          {currentDraft?.evidenceGaps && (
+            <EvidenceGapsCard gapResult={currentDraft.evidenceGaps} />
+          )}
+
+          {currentDraft?.contradictions && (
+            <ContradictionsCard
+              contradictionResult={currentDraft.contradictions}
+              userClarifications={userClarifications}
+              onClarificationSubmit={handleClarificationSubmit}
+            />
+          )}
+        </section>
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 6. Contradictions & User Clarification (Module 08)                       */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {currentDraft?.contradictions && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-            Step 6 · Contradiction Resolution
-          </div>
-          <ContradictionsCard
-            contradictionResult={currentDraft.contradictions}
-            userClarifications={userClarifications}
-            onClarificationSubmit={handleClarificationSubmit}
-          />
-        </div>
-      )}
-
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 7. Verified Guidance & Trust Layer (Module 09)                           */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 6. VERIFIED INFORMATION (Supported, Partially Supported, Uncertain) */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
       {currentDraft?.responseVerification && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-            Step 7 · Verified Findings & Claims
+        <section id="sec-verified" className="space-y-4 card-reveal" aria-labelledby="heading-sec-6">
+          <div className="step-badge">
+            <span className="dot" style={{ background: '#34d399' }}></span>
+            Section 6 · Verified Information
           </div>
           <VerifiedGuidanceCard verification={currentDraft.responseVerification} />
-        </div>
+        </section>
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 8. Action Path Roadmap (Module 10)                                       */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* 7. YOUR NEXT STEPS (Roadmap, Documents, Human Help Bridge)          */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
       {currentDraft?.actionPath && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Step 8 · Your Action Path
+        <section id="sec-action" className="space-y-6 card-reveal" aria-labelledby="heading-sec-7">
+          <div className="step-badge">
+            <span className="dot" style={{ background: '#34d399' }}></span>
+            Section 7 · Your Next Steps
           </div>
-          <ActionPathCard actionPath={currentDraft.actionPath} />
-        </div>
-      )}
 
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {/* 9. Save Case Prompt                                                      */}
-      {/* ──────────────────────────────────────────────────────────────────────── */}
-      {currentDraft && <SaveCasePrompt draft={currentDraft} />}
+          <ActionPathCard actionPath={currentDraft.actionPath} />
+
+          {/* Human Help Bridge if recommended */}
+          {currentDraft.actionPath.humanHelpRecommended && (
+            <HumanHelpBridgeCard
+              jurisdiction={currentDraft.domainRouting?.jurisdiction ?? currentDraft.jurisdiction ?? undefined}
+              reasoning={currentDraft.actionPath.humanHelpReasoning ?? undefined}
+              domain={currentDraft.domainRouting?.domain}
+            />
+          )}
+
+          {/* Document Generator Integrated directly into workspace */}
+          <div className="pt-2">
+            <DocumentGeneratorCard />
+          </div>
+
+          {/* Save Case Prompt & Persistence */}
+          <SaveCasePrompt draft={currentDraft} />
+
+          {/* ═══ Feature 20: Case Privacy & Data Controls ═══ */}
+          <section
+            className="glass-card-static p-6 space-y-4 rounded-2xl"
+            style={{ border: '1px solid var(--color-border)' }}
+            aria-labelledby="privacy-controls-heading"
+          >
+            <div className="flex items-start justify-between flex-wrap gap-4">
+              <div className="space-y-1">
+                <h3
+                  id="privacy-controls-heading"
+                  className="text-sm font-bold flex items-center gap-2 text-white"
+                >
+                  <span>🔒</span> {t.privacy.title}
+                </h3>
+                <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                  {t.privacy.description}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Clear the current case draft and return to intake?')) {
+                      clearDraft();
+                      onReset?.();
+                    }
+                  }}
+                  className="px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-300 bg-slate-900/80 hover:bg-slate-800 hover:text-white border border-slate-700 transition-colors"
+                >
+                  {t.privacy.clearDraft}
+                </button>
+
+                {caseId && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('Permanently delete this case record from your private account?')) {
+                        try {
+                          await deleteCase(caseId);
+                          setCaseId(null);
+                          clearDraft();
+                          onReset?.();
+                        } catch (e) {
+                          alert('Could not delete case: ' + (e instanceof Error ? e.message : 'Unknown error'));
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2 text-xs font-semibold rounded-xl text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 transition-colors"
+                  >
+                    {t.privacy.deleteCase}
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+        </section>
+      )}
     </div>
   );
 };

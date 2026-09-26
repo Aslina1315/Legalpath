@@ -1,5 +1,5 @@
 /**
- * AI State Indicator.
+ * AI State Indicator — Premium dark variant.
  * Visually reflects the current AI processing state.
  * Maps to REAL backend/AI state changes — no fake timers.
  */
@@ -20,31 +20,53 @@ export function AIStateIndicator({ state, className }: AIStateIndicatorProps) {
 
   if (state === 'IDLE') return null;
 
+  const isActive = !meta.isTerminal && !meta.isError;
+  const isReady = meta.state === 'READY';
+  const isError = meta.isError;
+
   return (
     <div
       role="status"
       aria-live="polite"
       aria-label={`AI status: ${meta.label}`}
       className={clsx(
-        'flex items-center gap-3 rounded-lg px-4 py-3',
+        'flex items-center gap-3 rounded-xl px-4 py-3',
         'text-sm font-medium',
         'transition-all duration-300 motion-reduce:transition-none',
-        !meta.isError && 'bg-brand-50 text-brand-700',
-        meta.isError && 'bg-red-50 text-trust-red',
-        meta.state === 'READY' && 'bg-green-50 text-trust-green',
         className
       )}
+      style={{
+        background: isError
+          ? 'rgba(248, 113, 113, 0.06)'
+          : isReady
+          ? 'rgba(52, 211, 153, 0.06)'
+          : 'rgba(99, 102, 241, 0.06)',
+        color: isError
+          ? '#f87171'
+          : isReady
+          ? '#34d399'
+          : '#a78bfa',
+        border: `1px solid ${
+          isError
+            ? 'rgba(248, 113, 113, 0.15)'
+            : isReady
+            ? 'rgba(52, 211, 153, 0.15)'
+            : 'rgba(99, 102, 241, 0.15)'
+        }`,
+      }}
     >
       {/* State dot */}
-      <span
-        aria-hidden="true"
-        className={clsx(
-          'flex-shrink-0 h-2 w-2 rounded-full',
-          !meta.isTerminal && !meta.isError && 'animate-pulse-soft bg-brand-500',
-          meta.state === 'READY' && 'bg-trust-green',
-          meta.isError && 'bg-trust-red'
+      <span aria-hidden="true" className="relative flex-shrink-0">
+        {isActive && (
+          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-current opacity-50"></span>
         )}
-      />
+        <span
+          className={clsx(
+            'relative inline-flex h-2 w-2 rounded-full bg-current',
+            isActive && 'animate-pulse-soft'
+          )}
+        />
+      </span>
 
       <span>{meta.label}</span>
     </div>

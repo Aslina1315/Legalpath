@@ -13,6 +13,7 @@ import { getAIInstance } from './aiClient';
 import { STRUCTURED_MODEL } from './models';
 import { PROMPTS } from './prompts';
 import { KnowledgeRetrievalZodSchema, KNOWLEDGE_RETRIEVAL_FIREBASE_SCHEMA } from './schemas';
+import { executeWithGemini429Handling } from './structuredOutputHelper';
 import type { KnowledgeRetrievalResult, KnowledgeSource, DomainRoutingResult } from '@/types/ai';
 import type { CaseIntakeResult } from './schemas';
 import type { AIStructuredResponse } from '@/types/ai';
@@ -21,7 +22,7 @@ export interface KnowledgeRetrievalOptions {
   structuredFacts?: Array<{ text: string }> | string[];
   domain: string;
   subDomain?: string;
-  jurisdiction: string;
+  jurisdiction?: string | null;
   narrative?: string;
 }
 
@@ -39,24 +40,24 @@ export async function runKnowledgeRetrieval(
   if (typeof narrativeOrOptions === 'object') {
     domain = narrativeOrOptions.domain;
     subDomain = narrativeOrOptions.subDomain;
-    jurisdiction = narrativeOrOptions.jurisdiction;
+    jurisdiction = narrativeOrOptions.jurisdiction || 'Unspecified (General Statutory Guidance)';
     facts = Array.isArray(narrativeOrOptions.structuredFacts)
       ? narrativeOrOptions.structuredFacts.map((f) => (typeof f === 'string' ? f : f.text))
       : [];
     summaryText = narrativeOrOptions.narrative || facts.join('; ');
   } else {
-    if (!domainResult?.domain || !domainResult?.jurisdiction) {
-      throw new Error('Legal domain and jurisdiction are required for knowledge retrieval.');
+    if (!domainResult?.domain) {
+      throw new Error('Legal domain is required for knowledge retrieval.');
     }
     domain = domainResult.domain;
     subDomain = domainResult.subDomain;
-    jurisdiction = domainResult.jurisdiction;
+    jurisdiction = domainResult.jurisdiction || 'Unspecified (General Statutory Guidance)';
     facts = intakeSummary?.keyFacts || [];
     summaryText = intakeSummary?.summary || narrativeOrOptions;
   }
 
-  if (!domain || !jurisdiction) {
-    throw new Error('Legal domain and jurisdiction are required for knowledge retrieval.');
+  if (!domain) {
+    throw new Error('Legal domain is required for knowledge retrieval.');
   }
 
   const researchContext = {
@@ -101,7 +102,7 @@ ${originalContext.trim().slice(0, 1500)}
     tools: [{ googleSearch: {} } as unknown as Record<string, unknown>],
   });
 
-  const result = await model.generateContent(prompt);
+  const result = await executeWithGemini429Handling(() => model.generateContent(prompt));
   const responseText = result.response.text();
 
   let parsed: unknown;

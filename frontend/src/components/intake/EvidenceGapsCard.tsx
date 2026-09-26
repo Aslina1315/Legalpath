@@ -1,6 +1,6 @@
 /**
- * EvidenceGapsCard — Renders AI Module 07 Evidence Gap Detector
- * highlighting missing documents, dates, and communications needed to substantiate claims.
+ * EvidenceGapsCard — Renders AI Module 07 Evidence Gap Detector.
+ * Premium dark glass card variant.
  */
 
 'use client';
@@ -16,79 +16,117 @@ export function EvidenceGapsCard({ gapResult }: EvidenceGapsCardProps) {
 
   return (
     <article
-      className="rounded-xl border border-neutral-200 bg-white shadow-sm animate-fade-in overflow-hidden"
+      className="glass-card-static animate-fade-in overflow-hidden"
       aria-labelledby="evidence-gaps-heading"
     >
-      <div className="border-b border-neutral-100 bg-neutral-50/50 px-5 py-3.5 flex items-center justify-between flex-wrap gap-2">
+      <div
+        className="px-5 py-4 flex items-center justify-between flex-wrap gap-2"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-rose-600">
+          <span
+            className="text-[10px] font-mono font-semibold uppercase tracking-widest"
+            style={{ color: '#a78bfa' }}
+          >
             Module 07 · Evidentiary Audit
           </span>
-          <h3 id="evidence-gaps-heading" className="text-sm font-semibold text-neutral-800">
+          <h3
+            id="evidence-gaps-heading"
+            className="text-sm font-bold mt-0.5"
+            style={{ color: 'var(--color-text-primary)' }}
+          >
             Evidence Gap Detection
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-500 font-medium">Completeness:</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Completeness:</span>
           <div className="flex items-center gap-1.5">
-            <div className="h-2 w-16 rounded-full bg-neutral-200 overflow-hidden">
+            <div
+              className="h-2 w-16 rounded-full overflow-hidden"
+              style={{ background: 'rgba(99, 102, 241, 0.1)' }}
+            >
               <div
                 className={`h-full rounded-full transition-all ${
-                  completenessPct >= 75 ? 'bg-emerald-500' : completenessPct >= 45 ? 'bg-amber-500' : 'bg-rose-500'
+                  completenessPct >= 75 ? 'bg-trust-green' : completenessPct >= 45 ? 'bg-trust-amber' : 'bg-trust-red'
                 }`}
                 style={{ width: `${completenessPct}%` }}
                 aria-hidden="true"
               />
             </div>
-            <span className="text-xs font-mono font-semibold text-neutral-700">{completenessPct}%</span>
+            <span className="text-xs font-mono font-semibold" style={{ color: 'var(--color-text-primary)' }}>{completenessPct}%</span>
           </div>
         </div>
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Overview summary */}
-        <p className="text-sm text-neutral-700 leading-relaxed bg-neutral-50 rounded-lg p-3 border border-neutral-100">
+        <p
+          className="text-sm leading-relaxed rounded-xl p-4"
+          style={{
+            background: 'rgba(99, 102, 241, 0.04)',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border-subtle)',
+          }}
+        >
           {gapResult.summary}
         </p>
 
-        {/* Gaps List */}
         {gapResult.gaps.length > 0 ? (
           <div className="space-y-2.5">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-              Identified Evidentiary Gaps ({gapResult.gaps.length})
+            <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+              Identified Gaps ({gapResult.gaps.length})
             </h4>
             <div className="space-y-2">
               {gapResult.gaps.map((gap) => (
                 <div
                   key={gap.id}
-                  className="rounded-lg border border-neutral-200 bg-white p-3.5 transition-shadow hover:shadow-xs space-y-2"
+                  className="glass-card p-4 space-y-2"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-neutral-900 flex items-center gap-1.5">
-                      <span className="text-rose-500 font-bold" aria-hidden="true">!</span>
+                    <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-text-primary)' }}>
+                      <span className="text-trust-red font-bold" aria-hidden="true">!</span>
                       {gap.description}
                     </span>
                     <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        gap.importance === 'HIGH'
-                          ? 'bg-red-50 text-red-700 border border-red-200'
+                      className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+                      style={{
+                        background: gap.importance === 'HIGH'
+                          ? 'rgba(248, 113, 113, 0.1)'
                           : gap.importance === 'MEDIUM'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-neutral-100 text-neutral-600'
-                      }`}
+                          ? 'rgba(251, 191, 36, 0.1)'
+                          : 'rgba(99, 102, 241, 0.06)',
+                        color: gap.importance === 'HIGH'
+                          ? '#f87171'
+                          : gap.importance === 'MEDIUM'
+                          ? '#fbbf24'
+                          : 'var(--color-text-muted)',
+                        border: `1px solid ${
+                          gap.importance === 'HIGH'
+                            ? 'rgba(248, 113, 113, 0.2)'
+                            : gap.importance === 'MEDIUM'
+                            ? 'rgba(251, 191, 36, 0.2)'
+                            : 'var(--color-border)'
+                        }`,
+                      }}
                     >
                       {gap.importance} Priority
                     </span>
                   </div>
 
-                  <p className="text-xs text-neutral-600 leading-relaxed">
-                    <strong className="text-neutral-700">Why it matters:</strong> {gap.whyItMatters}
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                    <strong style={{ color: 'var(--color-text-primary)' }}>Why it matters:</strong> {gap.whyItMatters}
                   </p>
 
-                  <div className="rounded bg-neutral-50 px-2.5 py-1.5 border border-neutral-100 text-xs text-neutral-700 flex items-start gap-1.5">
-                    <span className="text-brand-500 font-bold shrink-0">↳</span>
+                  <div
+                    className="rounded-lg px-3 py-2 text-xs flex items-start gap-1.5"
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.04)',
+                      border: '1px solid var(--color-border-subtle)',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  >
+                    <span style={{ color: '#a78bfa' }} className="font-bold shrink-0">↳</span>
                     <span>
-                      <strong className="font-medium text-neutral-900">Recommended step:</strong>{' '}
+                      <strong className="font-medium" style={{ color: 'var(--color-text-primary)' }}>Recommended step:</strong>{' '}
                       {gap.suggestedClarification}
                     </span>
                   </div>
@@ -97,8 +135,15 @@ export function EvidenceGapsCard({ gapResult }: EvidenceGapsCardProps) {
             </div>
           </div>
         ) : (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800">
-            ✓ No critical factual or document gaps detected for this stage of dispute.
+          <div
+            className="rounded-xl p-3 text-xs"
+            style={{
+              background: 'rgba(52, 211, 153, 0.06)',
+              border: '1px solid rgba(52, 211, 153, 0.15)',
+              color: '#34d399',
+            }}
+          >
+            ✓ No critical factual or document gaps detected for this stage.
           </div>
         )}
       </div>

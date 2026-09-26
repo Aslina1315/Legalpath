@@ -6,8 +6,18 @@
 
 export const BRAND = {
   name: 'LegalPath',
-  tagline: 'Tell us what happened. Understand what matters. Know what to do next.',
+  headline: 'Understand what happened.\nKnow what to do next.',
+  headlineLine1: 'Understand what happened.',
+  headlineLine2: 'Know what to do next.',
+  tagline:
+    "Tell us your situation in your own words. We'll help organize the details, check current information, review your evidence, and build a clear next-step path.",
   shortDescription: 'AI-assisted legal access for everyone.',
+  trustSignals: [
+    { id: 'source-aware', label: 'Source-aware', description: 'Grounded in real authoritative legal sources' },
+    { id: 'evidence-aware', label: 'Evidence-aware', description: 'Cross-checks documents and narrative facts' },
+    { id: 'privacy-conscious', label: 'Privacy-conscious', description: 'Encrypted and never shared with third parties' },
+    { id: 'human-help', label: 'Human help when AI reaches its limits', description: 'Direct bridge to verified legal aid & official resources' },
+  ],
 } as const;
 
 export const COLORS = {
