@@ -35,14 +35,12 @@ function validateFirebaseConfig(): void {
   if (!process.env.NEXT_PUBLIC_FIREBASE_APP_ID) missing.push('NEXT_PUBLIC_FIREBASE_APP_ID');
 
   if (missing.length > 0) {
-    // In server-side static build (Next.js prerender), don't crash the build
-    if (typeof window === 'undefined') {
-      return;
+    if (typeof window !== 'undefined') {
+      console.warn(
+        `Missing Firebase environment variables: ${missing.join(', ')}. ` +
+          'Using safe placeholders so the app can still render; add valid Firebase values to frontend/.env.local to enable auth and AI features.'
+      );
     }
-    throw new Error(
-      `Missing required Firebase environment variables:\n${missing.join('\n')}\n` +
-      `Copy .env.example to frontend/.env.local and fill in your Firebase project values.`
-    );
   }
 }
 

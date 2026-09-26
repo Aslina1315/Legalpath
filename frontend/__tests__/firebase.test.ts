@@ -21,10 +21,15 @@ describe('Firebase config validation', () => {
     process.env = originalEnv;
   });
 
-  it('throws when required env vars are missing', async () => {
+  it('warns instead of crashing the browser when required env vars are missing', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    await expect(import('@/lib/firebase/firebase')).rejects.toThrow(
-      /Missing required Firebase environment variables/
+
+    await expect(import('@/lib/firebase/firebase')).resolves.toBeDefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Missing Firebase environment variables')
     );
+
+    warnSpy.mockRestore();
   });
 });

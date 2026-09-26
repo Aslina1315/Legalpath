@@ -42,19 +42,30 @@ export function extractRetryDelayMs(error: unknown): number {
 }
 
 /**
- * Executes a Gemini operation with minimal 429 handling.
- * Do not retry a rate-limited request in a loop; surface a single user-facing message instead.
+ * Executes a Gemini operation with at-most-one 429 retry.
+ * The provider may include a retry-after delay, but we never loop forever.
  */
 export async function executeWithGemini429Handling<T>(
   operation: () => Promise<T>
 ): Promise<T> {
   try {
     return await operation();
-  } catch (error) {
-    if (is429Error(error)) {
-      throw new Error('AI is temporarily busy. Please retry in a moment.');
+  } catch (firstError) {
+    if (!is429Error(firstError)) {
+      throw firstError;
     }
-    throw error;
+
+    const delay = extractRetryDelayMs(firstError);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    try {
+      return await operation();
+    } catch (secondError) {
+      if (is429Error(secondError)) {
+        throw new Error('AI is temporarily at its request limit. Please retry shortly.');
+      }
+      throw secondError;
+    }
   }
 }
 
