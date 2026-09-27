@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_minute: int = 60
 
+    # Secondary fallback provider (server-side only)
+    groq_api_key: str | None = None
+
     # Future: Firebase Admin SDK credentials path
     # google_application_credentials: str | None = None
 

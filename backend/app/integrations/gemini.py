@@ -1,21 +1,35 @@
-"""
-Gemini API integration — STUB.
+"""Server-side Gemini configuration helpers.
 
-Server-side Gemini integration will use:
-  - google-generativeai or google-cloud-aiplatform SDK
-  - Service account credentials (Workload Identity on Cloud Run)
-  - Secret Manager for API key (not environment variables)
-
-For now: all AI calls go through Firebase AI Logic (client SDK).
-This server-side integration is for future backend-driven AI pipeline stages.
-
-Status: STUB — not yet implemented.
+This backend remains intentionally passive. The active production pipeline is the browser-based
+Firebase AI Logic path, so this module only validates that a server-side Gemini configuration is
+available when future backend-driven orchestration is enabled.
 """
 
+from __future__ import annotations
 
-def get_gemini_client() -> None:
-    """
-    Returns an initialized Gemini client.
-    PLANNED: Will use google-generativeai or Vertex AI SDK.
-    """
-    raise NotImplementedError("Server-side Gemini integration will be implemented in Stage 3.")
+import os
+from dataclasses import dataclass
+
+
+class GeminiConfigurationError(RuntimeError):
+    """Raised when a future backend Gemini configuration is missing."""
+
+
+@dataclass(frozen=True)
+class GeminiClientConfig:
+    """Configuration payload for a future server-side Gemini client."""
+
+    api_key: str
+    model: str = "gemini-2.5-flash"
+    backend: str = "google-generative-ai"
+
+
+def get_gemini_client() -> GeminiClientConfig:
+    """Return a typed Gemini config only when the server is explicitly configured."""
+    api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+    if not api_key or api_key.lower().startswith("replace_") or api_key.lower().startswith("your_"):
+        raise GeminiConfigurationError(
+            "Server-side Gemini is not configured. The deployed product currently uses Firebase AI Logic in the browser."
+        )
+
+    return GeminiClientConfig(api_key=api_key)

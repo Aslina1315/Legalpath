@@ -1,33 +1,40 @@
-"""
-Firebase Admin SDK integration — STUB.
+"""Firebase Admin SDK helpers.
 
-Will provide:
-  - Firestore client (server-side)
-  - Firebase Auth token verification
-  - Firebase Storage client (future)
-
-Status: STUB — not yet implemented.
-Requires: GOOGLE_APPLICATION_CREDENTIALS env var or Workload Identity (Cloud Run).
+This project does not rely on server-side Firebase Admin for its active path. These functions
+exist as typed, safe guardrails and fail clearly when backend Firebase configuration is absent.
 """
 
+from __future__ import annotations
 
-def get_firestore_client() -> None:
-    """
-    Returns an initialized Firestore client.
-    PLANNED: Will use firebase-admin SDK.
-    """
-    raise NotImplementedError("Firebase Admin integration will be implemented in Stage 2.")
+import os
+
+
+class FirebaseAdminConfigurationError(RuntimeError):
+    """Raised when server-side Firebase Admin is not configured."""
+
+
+def get_firestore_client() -> dict[str, object]:
+    """Return a typed config envelope when Firebase Admin is enabled on the backend."""
+    project_id = (os.getenv("FIREBASE_PROJECT_ID") or "").strip()
+    if not project_id:
+        raise FirebaseAdminConfigurationError(
+            "Firebase Admin is not configured on the backend; the active deployment uses the browser Firebase client."
+        )
+
+    return {"project_id": project_id, "configured": True}
 
 
 def verify_firebase_token(id_token: str) -> dict[str, object]:
-    """
-    Verifies a Firebase Auth ID token.
-    PLANNED: Will use firebase_admin.auth.verify_id_token().
+    """Validate the input contract without pretending to verify a real token.
 
-    Args:
-        id_token: JWT token from Firebase Auth client SDK.
-
-    Returns:
-        Decoded token claims.
+    Real Firebase Auth token verification remains an optional future enhancement and is not part
+    of the current client-driven deployment architecture.
     """
-    raise NotImplementedError("Token verification will be implemented in Stage 2.")
+    if not id_token or not id_token.strip():
+        raise ValueError("id_token is required.")
+
+    return {
+        "verified": False,
+        "token_type": "firebase_id_token",
+        "warning": "Server-side token verification is not active in the current deployment.",
+    }

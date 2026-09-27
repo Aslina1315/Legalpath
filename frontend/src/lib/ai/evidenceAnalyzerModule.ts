@@ -10,11 +10,16 @@
 
 import { getGenerativeModel } from 'firebase/ai';
 import { getAIInstance } from './aiClient';
-import { STRUCTURED_MODEL } from './models';
+import { FALLBACK_MODEL, FALLBACK_MODEL_NAME, STRUCTURED_MODEL } from './models';
 import { PROMPTS } from './prompts';
 import { EvidenceAnalysisZodSchema, EVIDENCE_ANALYSIS_FIREBASE_SCHEMA } from './schemas';
 import { buildMultimodalParts, validateInlineFileSize } from './multimodalHelper';
-import { executeWithGemini429Handling } from './structuredOutputHelper';
+import {
+  callSecureBackendFallback,
+  canUseSecureBackendFallback,
+  executeWithGemini429Handling,
+  isTemporaryProviderError,
+} from './structuredOutputHelper';
 import type { EvidenceAnalysisResult } from '@/types/ai';
 import type { AIStructuredResponse } from '@/types/ai';
 
@@ -107,7 +112,7 @@ ${caseNarrative ? caseNarrative.trim().slice(0, 1000) : 'No narrative provided.'
   ]);
 
   const ai = getAIInstance();
-  const model = getGenerativeModel(ai, {
+  const primaryModel = getGenerativeModel(ai, {
     model: STRUCTURED_MODEL.model,
     generationConfig: {
       ...STRUCTURED_MODEL.generationConfig,
@@ -116,23 +121,80 @@ ${caseNarrative ? caseNarrative.trim().slice(0, 1000) : 'No narrative provided.'
     safetySettings: STRUCTURED_MODEL.safetySettings,
   });
 
-  const result = await executeWithGemini429Handling(() => model.generateContent(parts));
-  const responseText = result.response.text();
+  const fallbackModel = getGenerativeModel(ai, {
+    model: FALLBACK_MODEL_NAME,
+    generationConfig: {
+      ...FALLBACK_MODEL.generationConfig,
+      responseSchema: EVIDENCE_ANALYSIS_FIREBASE_SCHEMA,
+    },
+    safetySettings: FALLBACK_MODEL.safetySettings,
+  });
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(responseText);
-  } catch {
-    throw new Error(`Invalid JSON returned from Evidence Analyzer: ${responseText.slice(0, 200)}`);
+    const result = await executeWithGemini429Handling(
+      () => primaryModel.generateContent(parts),
+      undefined
+    );
+    const responseText = result.response.text();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      throw new Error(`Invalid JSON returned from Evidence Analyzer: ${responseText.slice(0, 200)}`);
+    }
+
+    const validated = EvidenceAnalysisZodSchema.parse(parsed);
+
+    return {
+      data: validated,
+      model: STRUCTURED_MODEL.model,
+      generatedAt: new Date().toISOString(),
+      promptTokens: result.response.usageMetadata?.promptTokenCount,
+      candidateTokens: result.response.usageMetadata?.candidatesTokenCount,
+    };
+  } catch (error) {
+    if (isTemporaryProviderError(error) && canUseSecureBackendFallback('multimodal')) {
+      try {
+        const fallback = await callSecureBackendFallback<{ status: string; text?: string; model?: string }>({
+          prompt: textInstruction,
+          systemPrompt:
+            'You are a careful legal evidence-review assistant. Return valid JSON only matching the expected evidence schema.',
+          capability: 'multimodal',
+        });
+
+        if (fallback.status === 'ok' && fallback.text) {
+          try {
+            const parsed = JSON.parse(fallback.text) as EvidenceAnalysisResult;
+            const normalized = EvidenceAnalysisZodSchema.parse(parsed);
+            return {
+              data: normalized,
+              model: fallback.model || 'qwen/qwen3.8-27b',
+              generatedAt: new Date().toISOString(),
+            };
+          } catch {
+            return {
+              data: {
+                documentType: 'UNKNOWN',
+                dates: [],
+                amounts: [],
+                peopleOrEntities: [],
+                importantStatements: [fallback.text.slice(0, 220)],
+                relevantClauses: [],
+                evidenceItems: [],
+                confidence: 0.5,
+                uncertainItems: ['Evidence review was temporarily unavailable during the secure fallback.'],
+              },
+              model: fallback.model || 'qwen/qwen3.8-27b',
+              generatedAt: new Date().toISOString(),
+            };
+          }
+        }
+      } catch {
+        // Fall through to the normal temporary error response below.
+      }
+    }
+
+    throw new Error('AI service is temporarily busy. Please try again shortly.');
   }
-
-  const validated = EvidenceAnalysisZodSchema.parse(parsed);
-
-  return {
-    data: validated,
-    model: STRUCTURED_MODEL.model,
-    generatedAt: new Date().toISOString(),
-    promptTokens: result.response.usageMetadata?.promptTokenCount,
-    candidateTokens: result.response.usageMetadata?.candidatesTokenCount,
-  };
 }

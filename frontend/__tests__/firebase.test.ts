@@ -1,12 +1,15 @@
 /**
  * Firebase initialization tests.
- * Verifies validation behavior without importing the browser-only Firebase boot path.
+ * Verifies browser-safe validation and initialization behavior for Firebase public env vars.
  */
 
-import { validateFirebaseConfig } from '@/lib/firebase/firebase';
+async function loadFirebaseModule() {
+  jest.resetModules();
+  return import('@/lib/firebase/firebase');
+}
 
 describe('Firebase config validation', () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -19,22 +22,58 @@ describe('Firebase config validation', () => {
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    process.env = { ...originalEnv };
+    jest.restoreAllMocks();
   });
 
-  it('fails clearly when required Firebase config is missing', () => {
+  it('reads valid NEXT_PUBLIC_* values correctly and initializes in the browser', async () => {
+    const { validateFirebaseConfig, getFirebaseApp } = await loadFirebaseModule();
+
+    expect(() => validateFirebaseConfig()).not.toThrow();
+
+    const firebaseApp = getFirebaseApp();
+    expect(firebaseApp).not.toBeNull();
+    expect(firebaseApp?.options.apiKey).toBe('test-api-key');
+    expect(firebaseApp?.options.authDomain).toBe('test.firebaseapp.com');
+    expect(firebaseApp?.options.projectId).toBe('test-project');
+    expect(firebaseApp?.options.storageBucket).toBe('test.appspot.com');
+    expect(firebaseApp?.options.messagingSenderId).toBe('123');
+    expect(firebaseApp?.options.appId).toBe('1:123:web:abc');
+  });
+
+  it('does not blank-screen when required Firebase config is missing', async () => {
     delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    const { getFirebaseApp, validateFirebaseConfig } = await loadFirebaseModule();
 
-    expect(() => validateFirebaseConfig()).toThrow(
-      'Missing or placeholder Firebase environment variables'
-    );
+    expect(() => validateFirebaseConfig()).toThrow('Missing or placeholder Firebase environment variables');
+    expect(getFirebaseApp()).toBeNull();
   });
 
-  it('fails clearly when placeholder Firebase config is present', () => {
+  it('does not initialize when placeholder Firebase config is present', async () => {
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY = 'build-placeholder-key';
+    const { getFirebaseApp, validateFirebaseConfig } = await loadFirebaseModule();
 
-    expect(() => validateFirebaseConfig()).toThrow(
-      'Missing or placeholder Firebase environment variables'
-    );
+    expect(() => validateFirebaseConfig()).toThrow('Missing or placeholder Firebase environment variables');
+    expect(getFirebaseApp()).toBeNull();
+  });
+
+  it('does not initialize Firebase during SSR', async () => {
+    const originalWindow = global.window;
+    Object.defineProperty(globalThis, 'window', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      const { getFirebaseApp } = await loadFirebaseModule();
+      expect(getFirebaseApp()).toBeNull();
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        value: originalWindow,
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 });

@@ -13,7 +13,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { VisuallyHidden } from '@/components/ui/VisuallyHidden';
-import { signInWithGoogle, signInWithEmail, signUpWithEmail, authErrorMessage } from '@/lib/firebase/auth';
+import { signInWithGoogle, signInWithEmail, signUpWithEmail, resolveAuthErrorMessage } from '@/lib/firebase/auth';
 
 // ─── Google Icon ─────────────────────────────────────────────────────────────
 
@@ -123,8 +123,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
       onSuccess?.();
       onClose();
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? '';
-      setError(authErrorMessage(code));
+      setError(resolveAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -144,8 +143,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, defaultMode = 'signin' }
       onSuccess?.();
       onClose();
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? '';
-      setError(authErrorMessage(code));
+      setError(resolveAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }

@@ -12,39 +12,50 @@
  *   NEXT_PUBLIC_FIREBASE_APP_ID
  */
 
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
-const requiredEnvVars = [
-  'NEXT_PUBLIC_FIREBASE_API_KEY',
-  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  'NEXT_PUBLIC_FIREBASE_APP_ID',
-] as const;
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? '',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? '',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? '',
+};
+
+const firebaseConfigEnvMap = {
+  apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY',
+  authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  appId: 'NEXT_PUBLIC_FIREBASE_APP_ID',
+} as const;
 
 export function validateFirebaseConfig(): void {
   const missing: string[] = [];
   const placeholders: string[] = [];
 
-  for (const key of requiredEnvVars) {
-    const value = process.env[key];
+  for (const [key, value] of Object.entries(firebaseConfig)) {
+    const envName = firebaseConfigEnvMap[key as keyof typeof firebaseConfigEnvMap];
+    const trimmedValue = typeof value === 'string' ? value.trim() : '';
 
-    if (!value) {
-      missing.push(key);
+    if (!trimmedValue) {
+      missing.push(envName);
       continue;
     }
 
+    const normalizedValue = trimmedValue.toLowerCase();
     if (
-      value.includes('build-placeholder') ||
-      value.includes('REPLACE_WITH_YOUR_') ||
-      value.includes('REPLACE_WITH_LOCAL') ||
-      value.includes('your-project') ||
-      value.includes('placeholder')
+      normalizedValue.includes('build-placeholder') ||
+      normalizedValue.includes('replace_with_your_') ||
+      normalizedValue.includes('replace_with_local') ||
+      normalizedValue.includes('your-project') ||
+      normalizedValue.includes('placeholder')
     ) {
-      placeholders.push(key);
+      placeholders.push(envName);
     }
   }
 
@@ -81,16 +92,16 @@ export function getFirebaseApp(): FirebaseApp | null {
     return cachedApp;
   }
 
-  const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  const safeFirebaseConfig: FirebaseOptions = {
+    apiKey: firebaseConfig.apiKey,
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+    storageBucket: firebaseConfig.storageBucket,
+    messagingSenderId: firebaseConfig.messagingSenderId,
+    appId: firebaseConfig.appId,
   };
 
-  cachedApp = initializeApp(firebaseConfig);
+  cachedApp = initializeApp(safeFirebaseConfig);
   return cachedApp;
 }
 

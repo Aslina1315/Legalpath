@@ -22,8 +22,11 @@ import { runEvidenceAnalysis } from '@/lib/ai/evidenceAnalyzerModule';
 import { runTrustAndAction } from '@/lib/ai/trustAndActionModule';
 import {
   is429Error,
+  isTemporaryProviderError,
+  isPermanentConfigurationError,
   extractRetryDelayMs,
   executeWithGemini429Handling,
+  executeWithGeminiFallback,
 } from '@/lib/ai/structuredOutputHelper';
 import { CaseUnderstandingZodSchema, TrustAndActionZodSchema } from '@/lib/ai/schemas';
 import type { KnowledgeRetrievalResult, EvidenceAnalysisResult } from '@/types/ai';
@@ -349,5 +352,39 @@ describe('Targeted Blocker Fixes Verification', () => {
 
     const defaultDelay = extractRetryDelayMs(quotaError);
     expect(defaultDelay).toBe(2500);
+  });
+
+  it('recognizes temporary provider failures over 429 and falls back once', async () => {
+    let callCount = 0;
+    const primary = jest.fn().mockImplementation(async () => {
+      callCount += 1;
+      throw new Error('500 This model is currently experiencing high demand. Spikes in demand are usually temporary.');
+    });
+    const fallback = jest.fn().mockImplementation(async () => {
+      callCount += 1;
+      return { ok: true, model: 'gemini-3.5-flash-lite' };
+    });
+
+    const result = await executeWithGeminiFallback(primary, fallback);
+
+    expect(result).toEqual({ ok: true, model: 'gemini-3.5-flash-lite' });
+    expect(primary).toHaveBeenCalledTimes(1);
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(callCount).toBe(2);
+    expect(isTemporaryProviderError(new Error('503 UNAVAILABLE: temporary service unavailable'))).toBe(true);
+    expect(isPermanentConfigurationError(new Error('Firebase: Error (auth/invalid-api-key)'))).toBe(true);
+  });
+
+  it('does not retry or fallback for permanent configuration and invalid request errors', async () => {
+    const primary = jest.fn().mockRejectedValue(new Error('INVALID_ARGUMENT: invalid model configuration'));
+    const fallback = jest.fn();
+
+    await expect(executeWithGeminiFallback(primary, fallback)).rejects.toThrow(
+      'INVALID_ARGUMENT: invalid model configuration'
+    );
+    expect(primary).toHaveBeenCalledTimes(1);
+    expect(fallback).not.toHaveBeenCalled();
+    expect(isTemporaryProviderError(new Error('permission denied'))).toBe(false);
+    expect(isPermanentConfigurationError(new Error('permission denied'))).toBe(true);
   });
 });
