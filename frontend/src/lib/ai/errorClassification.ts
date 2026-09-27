@@ -54,15 +54,18 @@ export function classifyAIError(error: unknown): ClassifiedAIError {
     };
   }
 
-  // Rate Limits (429, quota, resource_exhausted)
+  // Rate Limits (429, quota, resource_exhausted, our own sanitized messages)
   if (
     msg.includes('429') ||
     msg.includes('resource_exhausted') ||
     msg.includes('quota') ||
     msg.includes('rate limit') ||
+    msg.includes('request limit') ||
     msg.includes('too many requests') ||
     msg.includes('generaterequestsperminute') ||
-    msg.includes('groq_rate_limited')
+    msg.includes('groq_rate_limited') ||
+    msg.includes('rate limited') ||
+    msg.includes('wait a moment')
   ) {
     return {
       code: 'AI_RATE_LIMIT',

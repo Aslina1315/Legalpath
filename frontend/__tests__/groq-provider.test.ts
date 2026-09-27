@@ -82,8 +82,9 @@ describe('Groq Primary Provider & Demo Mode', () => {
     expect(result.model).toBe('qwen/qwen3.8-27b');
   });
 
-  it('handles Groq rate limit (429) truthfully without falling back to Gemini in Groq-only mode', async () => {
+  it('handles Groq rate limit (429) in Groq-only mode: surfaces rate-limit error without calling Gemini', async () => {
     process.env.NEXT_PUBLIC_AI_PRIMARY_PROVIDER = 'groq';
+    process.env.NEXT_PUBLIC_AI_GROQ_ONLY = 'true'; // Groq-only mode: no Gemini fallback
 
     const fetchSpy = jest.fn().mockResolvedValue({
       ok: false,
@@ -106,9 +107,10 @@ describe('Groq Primary Provider & Demo Mode', () => {
       )
     ).rejects.toThrow('request limit');
 
-    // Gemini must still not be called
+    // In Groq-only mode, Gemini must NOT be called
     expect(getGenerativeModel).not.toHaveBeenCalled();
   });
+
 
   it('restores Gemini primary behavior when NEXT_PUBLIC_AI_PRIMARY_PROVIDER is gemini', async () => {
     process.env.NEXT_PUBLIC_AI_PRIMARY_PROVIDER = 'gemini';

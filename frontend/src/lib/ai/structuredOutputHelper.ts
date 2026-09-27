@@ -733,7 +733,19 @@ export async function generateStructured<T>(
         };
       } catch (geminiError) {
         console.error('[AI] Both Groq and Gemini fallback failed:', geminiError);
-        throw new Error(sanitizeUserFacingErrorMessage(geminiError));
+        // Preserve the original Groq error message when it's more specific (e.g., rate limit).
+        // If Groq returned a rate limit / temporary error, surface that — not Gemini's
+        // unrelated "Firebase not configured" or generic failure.
+        const groqClassified = classifyAIError(groqError);
+        const geminiClassified = classifyAIError(geminiError);
+        // Use Groq's message if it is more meaningful (rate limit > configuration error > unknown)
+        const useGroqMessage =
+          groqClassified.code === 'AI_RATE_LIMIT' ||
+          groqClassified.code === 'AI_TEMPORARY_UNAVAILABLE' ||
+          groqClassified.code === 'AI_TIMEOUT' ||
+          geminiClassified.code === 'AI_CONFIGURATION' ||
+          geminiClassified.code === 'AI_UNKNOWN';
+        throw new Error(useGroqMessage ? groqClassified.userMessage : geminiClassified.userMessage);
       }
     }
   }
