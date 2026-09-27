@@ -27,6 +27,7 @@ import { runCaseUnderstanding } from '@/lib/ai/caseUnderstandingModule';
 import { runKnowledgeRetrieval } from '@/lib/ai/knowledgeRetrievalModule';
 import { runEvidenceAnalysis, type UploadedEvidenceFile } from '@/lib/ai/evidenceAnalyzerModule';
 import { runTrustAndAction } from '@/lib/ai/trustAndActionModule';
+import { sanitizeUserFacingErrorMessage } from '@/lib/ai/errorClassification';
 
 import type { CaseStructureResult } from '@/lib/ai/schemas';
 import type { DomainRoutingResult, EvidenceAnalysisResult } from '@/types/ai';
@@ -612,15 +613,10 @@ export function IntakeForm() {
           >
             <span aria-hidden="true">⚠️</span>
             <div className="flex-1 space-y-1">
-              <strong className="block text-amber-300 font-semibold">AI Pipeline Notice</strong>
+              <strong className="block text-amber-300 font-semibold">AI Service Notice</strong>
               <p className="leading-relaxed">
-                {is429Message ? 'AI is temporarily busy. Please retry in a moment.' : aiError}
+                {sanitizeUserFacingErrorMessage(aiError)}
               </p>
-              {showConfigHint && (
-                <p className="text-[11px] text-amber-400/80">
-                  Check that your Firebase/Gemini credentials in <code className="bg-black/30 px-1 py-0.5 rounded font-mono">.env.local</code> are configured.
-                </p>
-              )}
             </div>
           </div>
         )}

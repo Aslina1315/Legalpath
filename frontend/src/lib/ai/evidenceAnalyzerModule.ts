@@ -1,23 +1,26 @@
 /**
- * AI Module 06: AI Evidence Analyzer (Multimodal)
+ * AI Module 06: AI Evidence Analyzer
  *
- * Inspects user-uploaded legal documents (PDF, PNG, JPEG, WebP)
- * using Gemini multimodal capabilities and extracts verifiable facts,
- * clauses, amounts, parties, and evidentiary weight.
+ * In Gemini mode: Inspects user-uploaded legal documents (PDF, PNG, JPEG, WebP)
+ * using Gemini multimodal capabilities.
+ *
+ * In Groq mode: Analyzes document text context and metadata using backend Groq.
  *
  * Enforces strict MIME and file size validation.
  */
 
 import { getGenerativeModel } from 'firebase/ai';
 import { getAIInstance } from './aiClient';
-import { FALLBACK_MODEL, FALLBACK_MODEL_NAME, STRUCTURED_MODEL } from './models';
+import { FALLBACK_MODEL_NAME, STRUCTURED_MODEL } from './models';
 import { PROMPTS } from './prompts';
 import { EvidenceAnalysisZodSchema, EVIDENCE_ANALYSIS_FIREBASE_SCHEMA } from './schemas';
 import { buildMultimodalParts, validateInlineFileSize } from './multimodalHelper';
 import {
+  callSecureBackendGenerate,
   callSecureBackendFallback,
   canUseSecureBackendFallback,
   executeWithGemini429Handling,
+  isGroqPrimary,
   isTemporaryProviderError,
 } from './structuredOutputHelper';
 import type { EvidenceAnalysisResult } from '@/types/ai';
@@ -106,6 +109,46 @@ ${caseNarrative ? caseNarrative.trim().slice(0, 1000) : 'No narrative provided.'
 </untrusted_data>
 ---`;
 
+  // ─── GROQ PRIMARY MODE ─────────────────────────────────────────────────────
+  if (isGroqPrimary()) {
+    console.log('[AI] primary=groq');
+    console.log('[AI] evidence-analysis: Groq primary (zero Gemini calls)');
+
+    const backendResponse = await callSecureBackendGenerate<{
+      status: string;
+      text?: string;
+      model?: string;
+    }>({
+      prompt: textInstruction,
+      systemPrompt:
+        'You are a careful legal evidence-review assistant. Return valid JSON only matching the expected evidence schema.',
+      capability: 'multimodal',
+    });
+
+    if (backendResponse.status !== 'ok' || !backendResponse.text) {
+      throw new Error('AI service is temporarily busy. Please try again shortly.');
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(backendResponse.text);
+    } catch {
+      throw new Error(`Invalid JSON returned from Evidence Analyzer: ${backendResponse.text.slice(0, 200)}`);
+    }
+
+    const validated = EvidenceAnalysisZodSchema.parse(parsed);
+
+    return {
+      data: validated,
+      model: backendResponse.model || 'qwen/qwen3.8-27b',
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // ─── GEMINI MODE ───────────────────────────────────────────────────────────
+  console.log('[AI] primary=gemini');
+  console.log('[AI] evidence-analysis: Gemini multimodal');
+
   const parts = buildMultimodalParts([
     { type: 'text', text: textInstruction },
     { type: 'file', mimeType: file.mimeType, data: file.base64Data },
@@ -119,15 +162,6 @@ ${caseNarrative ? caseNarrative.trim().slice(0, 1000) : 'No narrative provided.'
       responseSchema: EVIDENCE_ANALYSIS_FIREBASE_SCHEMA,
     },
     safetySettings: STRUCTURED_MODEL.safetySettings,
-  });
-
-  const fallbackModel = getGenerativeModel(ai, {
-    model: FALLBACK_MODEL_NAME,
-    generationConfig: {
-      ...FALLBACK_MODEL.generationConfig,
-      responseSchema: EVIDENCE_ANALYSIS_FIREBASE_SCHEMA,
-    },
-    safetySettings: FALLBACK_MODEL.safetySettings,
   });
 
   try {
@@ -191,7 +225,7 @@ ${caseNarrative ? caseNarrative.trim().slice(0, 1000) : 'No narrative provided.'
           }
         }
       } catch {
-        // Fall through to the normal temporary error response below.
+        // Fall through to error
       }
     }
 

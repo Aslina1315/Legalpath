@@ -38,7 +38,12 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_minute: int = 60
 
-    # Secondary fallback provider (server-side only)
+    # AI Provider routing (gemini or groq)
+    ai_primary_provider: Literal["gemini", "groq"] = "groq"
+    ai_groq_only: bool = False
+    groq_model: str = "qwen/qwen3.8-27b"
+
+    # Secondary / Primary Groq API Key (server-side only)
     groq_api_key: str | None = None
 
     # Future: Firebase Admin SDK credentials path

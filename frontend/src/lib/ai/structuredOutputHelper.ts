@@ -1,6 +1,6 @@
 /**
- * Structured output helper for Firebase AI Logic.
- * Enables typed JSON responses from Gemini using responseSchema.
+ * Structured output helper for Firebase AI Logic & Groq Backend Provider.
+ * Enables typed JSON responses with strict Zod validation and provider routing.
  */
 
 import { getGenerativeModel } from 'firebase/ai';
@@ -103,6 +103,55 @@ export function extractRetryDelayMs(error: unknown): number {
 
 const TEMPORARY_RATE_LIMIT_MESSAGE = 'AI is temporarily at its request limit. Please retry shortly.';
 
+import { classifyAIError, sanitizeUserFacingErrorMessage } from './errorClassification';
+
+export interface BackendAIConfig {
+  status: string;
+  primary_provider: 'gemini' | 'groq';
+  groq_only: boolean;
+  model: string;
+  has_groq_key: boolean;
+}
+
+let cachedBackendConfig: BackendAIConfig | null = null;
+
+export function isGroqPrimary(): boolean {
+  if (cachedBackendConfig) {
+    return cachedBackendConfig.primary_provider === 'groq';
+  }
+  const envPrimary = (
+    (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_AI_PRIMARY_PROVIDER) ||
+    'groq'
+  ).trim().toLowerCase();
+  return envPrimary === 'groq';
+}
+
+export function isGroqOnly(): boolean {
+  if (cachedBackendConfig) {
+    return cachedBackendConfig.groq_only;
+  }
+  const envGroqOnly = (
+    (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_AI_GROQ_ONLY) ||
+    'false'
+  ).trim().toLowerCase();
+  return envGroqOnly === 'true';
+}
+
+export async function fetchBackendAIConfig(): Promise<BackendAIConfig | null> {
+  if (cachedBackendConfig) return cachedBackendConfig;
+  try {
+    const res = await fetch('/api/backend/ai/config', { method: 'GET' });
+    if (res.ok) {
+      const data = (await res.json()) as BackendAIConfig;
+      cachedBackendConfig = data;
+      return data;
+    }
+  } catch {
+    // Graceful offline fallback
+  }
+  return null;
+}
+
 export function isDevelopmentForcedFallbackEnabled(): boolean {
   const envValue =
     (typeof process !== 'undefined' && process.env)
@@ -120,14 +169,14 @@ export function canUseSecureBackendFallback(capability: 'structured' | 'grounded
   return capability === 'structured' || capability === 'grounded' || capability === 'multimodal';
 }
 
-export async function callSecureBackendFallback<T>(payload: {
+export async function callSecureBackendGenerate<T>(payload: {
   prompt: string;
   systemPrompt?: string;
   system_prompt?: string;
   model?: string;
   capability?: 'structured' | 'grounded' | 'multimodal';
 }): Promise<T> {
-  const response = await fetch('/api/backend/ai/fallback', {
+  const response = await fetch('/api/backend/ai/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -140,7 +189,15 @@ export async function callSecureBackendFallback<T>(payload: {
     detail?: { message?: string; code?: string; provider?: string };
     message?: string;
     status?: string;
+    code?: string;
+    rate_limited?: boolean;
+    retry_after?: number;
   };
+
+  if (response.status === 429 || data?.code === 'GROQ_RATE_LIMITED' || data?.rate_limited) {
+    console.warn('[AI] provider=groq\n[AI] error=429\n[AI] rate_limited=true');
+    throw new Error('AI is temporarily at its request limit. Please wait a moment and retry.');
+  }
 
   if (!response.ok) {
     const message =
@@ -151,6 +208,16 @@ export async function callSecureBackendFallback<T>(payload: {
   }
 
   return data;
+}
+
+export async function callSecureBackendFallback<T>(payload: {
+  prompt: string;
+  systemPrompt?: string;
+  system_prompt?: string;
+  model?: string;
+  capability?: 'structured' | 'grounded' | 'multimodal';
+}): Promise<T> {
+  return callSecureBackendGenerate<T>(payload);
 }
 
 export async function executeWithGeminiFallback<T>(
@@ -176,18 +243,8 @@ export async function executeWithGeminiFallback<T>(
   }
 }
 
-interface StructuredGenerationResult<T> {
-  data: T;
-  model: string;
-  generatedAt: string;
-  promptTokens?: number;
-  candidateTokens?: number;
-  response: { response: { text: () => string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } } };
-}
-
 /**
  * Backward-compatible helper for old 429-specific call sites.
- * Allows at-most-one retry, but no fallback recursion.
  */
 export async function executeWithGemini429Handling<T>(
   operation: () => Promise<T>,
@@ -238,33 +295,6 @@ export async function executeWithGemini429Handling<T>(
       throw secondError;
     }
   }
-}
-
-function buildStructuredModelWithFallback(firebaseSchema: Schema) {
-  const ai = getAIInstance();
-
-  const primaryModel = getGenerativeModel(ai, {
-    model: STRUCTURED_MODEL.model,
-    generationConfig: {
-      ...STRUCTURED_MODEL.generationConfig,
-      responseSchema: firebaseSchema,
-    },
-    safetySettings: STRUCTURED_MODEL.safetySettings,
-  });
-
-  const fallbackModel = getGenerativeModel(ai, {
-    model: FALLBACK_MODEL_NAME,
-    generationConfig: {
-      ...FALLBACK_MODEL.generationConfig,
-      responseSchema: firebaseSchema,
-    },
-    safetySettings: FALLBACK_MODEL.safetySettings,
-  });
-
-  return {
-    primaryOperation: () => primaryModel.generateContent,
-    fallbackOperation: () => fallbackModel.generateContent,
-  };
 }
 
 function extractStructuredJsonCandidate(raw: unknown): unknown {
@@ -336,6 +366,28 @@ function extractStructuredJsonCandidate(raw: unknown): unknown {
   return raw;
 }
 
+/**
+ * Recursively converts all object keys from snake_case to camelCase.
+ * Handles nested objects and arrays.
+ * Groq models sometimes return snake_case keys even when prompted for camelCase.
+ * This is candidate[2] in parseAndValidateStructuredResponse — a universal fallback.
+ */
+function camelCaseify(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(camelCaseify);
+  }
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      // Convert snake_case → camelCase (handles multi-word: evidence_gaps → evidenceGaps)
+      const camel = k.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+      result[camel] = camelCaseify(v);
+    }
+    return result;
+  }
+  return value;
+}
+
 function normalizeStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
@@ -390,6 +442,20 @@ function normalizeTimelineEntry(entry: Record<string, unknown>) {
     approximateDate: entry.approximateDate ?? entry.approximate_date ?? null,
     confidence: confidenceValue,
   };
+}
+
+function normalizeEntityRole(role: unknown): 'CLAIMANT' | 'RESPONDENT' | 'WITNESS' | 'THIRD_PARTY' | 'INSTITUTION' | 'OTHER' {
+  const normalized = String(role ?? 'OTHER').trim().toUpperCase();
+  if (normalized === 'CLAIMANT' || normalized === 'RESPONDENT' || normalized === 'WITNESS' || normalized === 'THIRD_PARTY' || normalized === 'INSTITUTION' || normalized === 'OTHER') {
+    return normalized as 'CLAIMANT' | 'RESPONDENT' | 'WITNESS' | 'THIRD_PARTY' | 'INSTITUTION' | 'OTHER';
+  }
+  if (normalized.includes('TENANT') || normalized.includes('PLAINTIFF') || normalized.includes('CLIENT') || normalized.includes('USER') || normalized.includes('VICTIM')) {
+    return 'CLAIMANT';
+  }
+  if (normalized.includes('LANDLORD') || normalized.includes('DEFENDANT') || normalized.includes('EMPLOYER') || normalized.includes('COMPANY') || normalized.includes('OPPOSING')) {
+    return 'RESPONDENT';
+  }
+  return 'OTHER';
 }
 
 export function normalizeStructuredPayload<T extends Record<string, unknown>>(raw: unknown): T {
@@ -460,11 +526,26 @@ export function normalizeStructuredPayload<T extends Record<string, unknown>>(ra
     }
     return { description: String(entry), date: null, approximateDate: null, confidence: 0.5 };
   });
+  const entitiesSource = Array.isArray(unwrapped.entities) ? unwrapped.entities : [];
+  const normalizedEntities = entitiesSource.map((ent) => {
+    if (ent && typeof ent === 'object') {
+      const record = ent as Record<string, unknown>;
+      return {
+        name: typeof record.name === 'string' ? record.name : 'Unknown Entity',
+        role: normalizeEntityRole(record.role),
+        notes: typeof record.notes === 'string' ? record.notes : undefined,
+      };
+    }
+    return {
+      name: String(ent),
+      role: 'OTHER' as const,
+    };
+  });
 
   const normalized = {
     summary,
     structuredFacts: normalizedFacts,
-    entities: Array.isArray(unwrapped.entities) ? unwrapped.entities : [],
+    entities: normalizedEntities,
     timeline,
     domain:
       typeof unwrapped.domain === 'string'
@@ -489,7 +570,7 @@ export function normalizeStructuredPayload<T extends Record<string, unknown>>(ra
         ? unwrapped.jurisdiction
         : typeof unwrapped.detectedJurisdiction === 'string'
           ? unwrapped.detectedJurisdiction
-          : null,
+          : null, // Always null (never undefined) — satisfies z.string().nullable()
     jurisdictionConfidence:
       typeof unwrapped.jurisdictionConfidence === 'number'
         ? unwrapped.jurisdictionConfidence
@@ -516,12 +597,12 @@ export function normalizeStructuredPayload<T extends Record<string, unknown>>(ra
 }
 
 /**
- * Generates a structured JSON response from Gemini.
- * Validates the response against the provided Zod schema.
+ * Generates a structured JSON response from configured AI provider (Groq or Gemini).
+ * Validates the response strictly against the provided Zod schema.
  *
  * @param prompt - The prompt to send
- * @param firebaseSchema - Firebase AI responseSchema for the model
- * @param zodSchema - Zod schema for client-side validation
+ * @param firebaseSchema - Firebase AI responseSchema for Gemini (used in Gemini mode)
+ * @param zodSchema - Zod schema for validation
  * @returns Validated, typed response
  */
 export async function generateStructured<T>(
@@ -529,6 +610,138 @@ export async function generateStructured<T>(
   firebaseSchema: Schema,
   zodSchema: ZodSchema<T>
 ): Promise<AIStructuredResponse<T>> {
+  const parseAndValidateStructuredResponse = (responseText: string): T => {
+    // Pre-pass: strip markdown code fences (e.g. ```json\n{...}\n```) before parsing.
+    // Some Groq models return JSON wrapped in fences even when instructed not to.
+    let cleanedText = responseText.trim();
+    if (cleanedText.startsWith('```')) {
+      const firstNewline = cleanedText.indexOf('\n');
+      if (firstNewline !== -1) {
+        cleanedText = cleanedText.slice(firstNewline + 1);
+      }
+      if (cleanedText.trimEnd().endsWith('```')) {
+        cleanedText = cleanedText.trimEnd().slice(0, -3).trimEnd();
+      }
+    }
+
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(cleanedText);
+    } catch {
+      // Last-resort: use extractStructuredJsonCandidate which tries regex-based extraction
+      const extracted = extractStructuredJsonCandidate(cleanedText);
+      if (extracted && typeof extracted === 'object') {
+        parsedData = extracted;
+      } else {
+        throw new Error('The AI response could not be parsed. Please try again.');
+      }
+    }
+
+    const candidates: unknown[] = [
+      // Candidate 0: raw parsed JSON (field names exactly as returned by model)
+      parsedData,
+      // Candidate 1: CaseUnderstanding-aware normalization (handles Gemini response shape)
+      normalizeStructuredPayload(parsedData as Record<string, unknown>) as T,
+      // Candidate 2: Universal snake_case → camelCase conversion
+      // Handles Groq responses where fields come back as evidence_gaps, action_steps, etc.
+      camelCaseify(parsedData),
+    ];
+    let lastError: unknown;
+
+    for (const candidate of candidates) {
+      try {
+        const validated = zodSchema.parse(candidate);
+        console.log('[AI] normalization=pass');
+        console.log('[AI] zod=pass');
+        return validated;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    // Surface a human-readable error, not a raw ZodError schema dump
+    const zodMsg = lastError instanceof Error ? lastError.message : String(lastError);
+    const firstIssue = zodMsg.includes('"path"') ? '' : ` (${zodMsg.slice(0, 120)})`;
+    throw new Error(`AI analysis could not be completed — the response did not match the expected format.${firstIssue} Please try again.`);
+  };
+
+  // ─── GROQ PRIMARY / DEMO MODE ───────────────────────────────────────────────
+  if (isGroqPrimary()) {
+    console.log('[AI] primary=groq');
+    console.log('[AI] groq request started');
+
+    try {
+      const backendResponse = await callSecureBackendGenerate<{
+        status: string;
+        message: string;
+        provider?: string;
+        model?: string;
+        text?: string;
+      }>({
+        prompt,
+        systemPrompt:
+          'You are a careful legal assistance model. Return valid JSON only matching the requested schema and respect the task instructions exactly.',
+        capability: 'structured',
+      });
+
+      if (backendResponse.status !== 'ok' || !backendResponse.text) {
+        throw new Error('AI service is temporarily busy. Please try again shortly.');
+      }
+
+      console.log('[AI] groq response received');
+      const validated = parseAndValidateStructuredResponse(backendResponse.text);
+
+      return {
+        data: validated,
+        model: backendResponse.model || 'qwen/qwen3.8-27b',
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (groqError) {
+      console.warn('[AI] primary Groq call failed:', groqError);
+
+      if (isGroqOnly() || isPermanentConfigurationError(groqError)) {
+        throw new Error(sanitizeUserFacingErrorMessage(groqError));
+      }
+
+      const classified = classifyAIError(groqError);
+      if (!classified.canFallback) {
+        throw new Error(classified.userMessage);
+      }
+
+      console.log('[AI] Groq temporarily unavailable — falling back to Gemini (attempt 1/1)');
+      try {
+        const ai = getAIInstance();
+        const primaryModel = getGenerativeModel(ai, {
+          model: STRUCTURED_MODEL.model,
+          generationConfig: {
+            ...STRUCTURED_MODEL.generationConfig,
+            responseSchema: firebaseSchema,
+          },
+          safetySettings: STRUCTURED_MODEL.safetySettings,
+        });
+
+        const geminiRes = await primaryModel.generateContent(prompt);
+        const text = geminiRes.response.text();
+        const validated = parseAndValidateStructuredResponse(text);
+
+        return {
+          data: validated,
+          model: `${STRUCTURED_MODEL.model} (fallback)`,
+          generatedAt: new Date().toISOString(),
+          promptTokens: geminiRes.response.usageMetadata?.promptTokenCount,
+          candidateTokens: geminiRes.response.usageMetadata?.candidatesTokenCount,
+        };
+      } catch (geminiError) {
+        console.error('[AI] Both Groq and Gemini fallback failed:', geminiError);
+        throw new Error(sanitizeUserFacingErrorMessage(geminiError));
+      }
+    }
+  }
+
+  // ─── GEMINI PRIMARY / NORMAL MODE ───────────────────────────────────────────
+  console.log('[AI] primary=gemini');
+  console.log('[AI] gemini request started');
+
   const ai = getAIInstance();
   const primaryModel = getGenerativeModel(ai, {
     model: STRUCTURED_MODEL.model,
@@ -548,31 +761,6 @@ export async function generateStructured<T>(
     safetySettings: FALLBACK_MODEL.safetySettings,
   });
 
-  const parseAndValidateStructuredResponse = (responseText: string): T => {
-    let parsedData: unknown;
-    try {
-      parsedData = JSON.parse(responseText);
-    } catch {
-      throw new Error(`AI returned invalid JSON. Raw response: ${responseText.slice(0, 200)}`);
-    }
-
-    const candidates: unknown[] = [
-      parsedData,
-      normalizeStructuredPayload(parsedData as Record<string, unknown>) as T,
-    ];
-    let lastError: unknown;
-
-    for (const candidate of candidates) {
-      try {
-        return zodSchema.parse(candidate);
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    throw lastError instanceof Error ? lastError : new Error('AI response validation failed.');
-  };
-
   let selectedModelName: string = STRUCTURED_MODEL.model;
   const result = await executeWithGeminiFallback<Awaited<ReturnType<typeof primaryModel.generateContent>>>(
     async () => {
@@ -587,6 +775,7 @@ export async function generateStructured<T>(
       return response;
     },
     async () => {
+      console.log('[AI] falling back to backend Groq');
       const backendResponse = await callSecureBackendFallback<{
         status: string;
         message: string;
@@ -625,4 +814,3 @@ export async function generateStructured<T>(
     candidateTokens: result.response.usageMetadata?.candidatesTokenCount,
   };
 }
-

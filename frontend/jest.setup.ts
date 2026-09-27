@@ -6,6 +6,15 @@ process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_P
 process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'test.appspot.com';
 process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123';
 process.env.NEXT_PUBLIC_FIREBASE_APP_ID = process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:123:web:abc';
+process.env.NEXT_PUBLIC_AI_PRIMARY_PROVIDER = process.env.NEXT_PUBLIC_AI_PRIMARY_PROVIDER || 'gemini';
+
+if (typeof globalThis.fetch === 'undefined') {
+  globalThis.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ status: 'ok', text: '{}' }),
+  }) as unknown as typeof fetch;
+}
 
 // Global mock for firebase/ai in test environment
 jest.mock('firebase/ai', () => ({

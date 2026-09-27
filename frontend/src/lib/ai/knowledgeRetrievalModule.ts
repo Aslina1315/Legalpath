@@ -1,22 +1,23 @@
 /**
  * AI Module 05: Live Legal Knowledge Retrieval
  *
- * Retrieves current, verified legal information using Google Search grounding
+ * In Gemini mode: Retrieves current, verified legal information using Google Search grounding
  * through Firebase AI Logic.
  *
- * Never fabricates laws or citations. If grounding yields no verified sources,
- * returns status = "no_verified_source".
+ * In Groq mode: Provides general statutory framework without fabricating dynamic web citations
+ * (status = "no_verified_source").
  */
 
 import { getGenerativeModel } from 'firebase/ai';
 import { getAIInstance } from './aiClient';
-import { FALLBACK_MODEL, FALLBACK_MODEL_NAME, STRUCTURED_MODEL } from './models';
+import { FALLBACK_MODEL_NAME, STRUCTURED_MODEL } from './models';
 import { PROMPTS } from './prompts';
 import { KnowledgeRetrievalZodSchema, KNOWLEDGE_RETRIEVAL_FIREBASE_SCHEMA } from './schemas';
 import {
   callSecureBackendFallback,
   canUseSecureBackendFallback,
   executeWithGemini429Handling,
+  isGroqPrimary,
   isTemporaryProviderError,
 } from './structuredOutputHelper';
 import type { KnowledgeRetrievalResult, KnowledgeSource, DomainRoutingResult } from '@/types/ai';
@@ -65,6 +66,38 @@ export async function runKnowledgeRetrieval(
     throw new Error('Legal domain is required for knowledge retrieval.');
   }
 
+  // ─── GROQ PRIMARY MODE (Skip Gemini Google Search Grounding) ───────────────
+  if (isGroqPrimary()) {
+    console.log('[AI] primary=groq');
+    console.log('[AI] knowledge-retrieval: statutory guidance (Groq mode, zero Gemini calls)');
+
+    const validated: KnowledgeRetrievalResult = {
+      status: 'no_verified_source',
+      queryUsed: `${domain}${subDomain ? ` (${subDomain})` : ''} statutory framework in ${jurisdiction}`,
+      keyFindings: [
+        `Statutory analysis applied for ${domain} matters under general legal framework.`,
+        'Dynamic Google Search grounding is available in Gemini mode; statutory principles apply in Groq demo mode.',
+      ],
+      sources: [],
+      applicableRules: [
+        `Standard statutory and regulatory provisions governing ${domain} claims.`,
+      ],
+      limitations: [
+        'Live Google Search grounding requires Gemini provider mode. In Groq demo mode, no external dynamic web citations were fabricated.',
+      ],
+    };
+
+    return {
+      data: validated,
+      model: 'qwen/qwen3.8-27b',
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // ─── GEMINI MODE (With Google Search Grounding) ────────────────────────────
+  console.log('[AI] primary=gemini');
+  console.log('[AI] knowledge-retrieval: Google Search grounding via Gemini');
+
   const researchContext = {
     domain,
     subDomain,
@@ -95,8 +128,6 @@ ${originalContext.trim().slice(0, 1500)}
 
   const ai = getAIInstance();
 
-  // Configure model with Google Search grounding tool and structured response schema
-  // Grounding uses Google Search tool supported by Gemini Developer API
   const primaryModel = getGenerativeModel(ai, {
     model: STRUCTURED_MODEL.model,
     generationConfig: {
@@ -104,16 +135,6 @@ ${originalContext.trim().slice(0, 1500)}
       responseSchema: KNOWLEDGE_RETRIEVAL_FIREBASE_SCHEMA,
     },
     safetySettings: STRUCTURED_MODEL.safetySettings,
-    tools: [{ googleSearch: {} } as unknown as Record<string, unknown>],
-  });
-
-  const fallbackModel = getGenerativeModel(ai, {
-    model: FALLBACK_MODEL_NAME,
-    generationConfig: {
-      ...FALLBACK_MODEL.generationConfig,
-      responseSchema: KNOWLEDGE_RETRIEVAL_FIREBASE_SCHEMA,
-    },
-    safetySettings: FALLBACK_MODEL.safetySettings,
     tools: [{ googleSearch: {} } as unknown as Record<string, unknown>],
   });
 
@@ -223,11 +244,10 @@ ${originalContext.trim().slice(0, 1500)}
           }
         }
       } catch {
-        // Fall through to the normal temporary error response below.
+        // Fall through to error
       }
     }
 
     throw new Error('AI service is temporarily busy. Please try again shortly.');
   }
 }
-

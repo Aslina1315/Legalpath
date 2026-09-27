@@ -37,6 +37,7 @@ import { deleteCase } from '@/lib/firebase/firestore';
 
 import { runEvidenceAnalysis, type UploadedEvidenceFile } from '@/lib/ai/evidenceAnalyzerModule';
 import { runTrustAndAction } from '@/lib/ai/trustAndActionModule';
+import { sanitizeUserFacingErrorMessage } from '@/lib/ai/errorClassification';
 
 import type { CaseStructureResult, CaseUnderstandingResult } from '@/lib/ai/schemas';
 import type { KnowledgeRetrievalResult } from '@/types/ai';
@@ -205,6 +206,7 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
         setActiveStepMessage('Analysis complete. All insights updated with new evidence.');
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Downstream pipeline processing error';
+        setAIState('ERROR');
         setAIError(msg);
       }
     },
@@ -426,7 +428,7 @@ export const ContinuousCaseWorkspace: React.FC<ContinuousCaseWorkspaceProps> = (
           <span className="text-base">⚠️</span>
           <div className="flex-1">
             <strong className="block font-semibold mb-0.5 text-red-200">Processing Note</strong>
-            <p className="leading-relaxed">{aiError}</p>
+            <p className="leading-relaxed">{sanitizeUserFacingErrorMessage(aiError)}</p>
           </div>
         </div>
       )}
